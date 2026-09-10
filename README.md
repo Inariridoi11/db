@@ -22,6 +22,9 @@ python3 serve.py
 # Órbita en http://localhost:8000 y Linux en http://localhost:8000/linux/
 ```
 
+Escucha en las dos formas de localhost (`127.0.0.1` y `::1`), porque en Windows el
+navegador prueba antes la IPv6 y un servidor solo-IPv4 le da *connection refused*.
+
 Usa `serve.py` y no `python -m http.server`: en Windows, el módulo estándar saca los
 tipos MIME del registro, donde `.css` y `.js` suelen estar como `text/plain`. Con ese tipo
 el navegador **ignora la hoja de estilos** (la web sale sin diseño) y **se niega a registrar
