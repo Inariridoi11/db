@@ -1,47 +1,73 @@
-/* Descarga el sistema a la caché del navegador y arranca v86 con lo guardado.
-   La consola de la máquina virtual sale por el puerto serie y la dibuja term.js. */
+/* Catálogo de sistemas para v86: descarga cada uno a la caché del navegador y
+   lo arranca desde ahí, con o sin conexión.
+
+   Los sistemas de consola sacan la pantalla por el puerto serie y la dibuja
+   term.js; los gráficos usan el canvas de v86, con teclado y ratón. */
 (function () {
   'use strict';
 
   var CACHE = 'orbita-linux-v1';
-  var PACK = [
-    { url: 'vendor/v86.wasm',    label: 'Emulador (WebAssembly)', bytes: 2101621 },
-    { url: 'vendor/seabios.bin', label: 'BIOS',                   bytes: 131072 },
-    { url: 'vendor/vgabios.bin', label: 'BIOS de vídeo',          bytes: 36352 },
-    { url: 'system/bzImage.bin', label: 'Kernel Linux 6.12',      bytes: 5788160 },
-    { url: 'system/initrd.gz',   label: 'Sistema de archivos',    bytes: 2276000 }
+
+  // Archivos que necesita cualquier sistema: el emulador y las dos BIOS.
+  var RUNTIME = [
+    { url: 'vendor/v86.wasm',    bytes: 2101621 },
+    { url: 'vendor/seabios.bin', bytes: 131072 },
+    { url: 'vendor/vgabios.bin', bytes: 36352 }
   ];
-  var TOTAL = PACK.reduce(function (n, f) { return n + f.bytes; }, 0);
+
+  var SYSTEMS = [
+    {
+      id: 'kolibri',
+      name: 'KolibriOS',
+      tag: 'gráfico',
+      kind: 'graphical',
+      desc: 'Escritorio completo escrito en ensamblador que cabe en un disquete. ' +
+            'Arranca en un segundo y trae editor, calculadora, gestor de archivos y juegos.',
+      hint: 'Ratón y teclado van a la máquina. Abre el menú de abajo a la izquierda.',
+      files: [{ url: 'system/kolibri.img', bytes: 1474560 }],
+      options: function (bufs) {
+        return { fda: { buffer: bufs[0] }, boot_order: 0x123 };
+      }
+    },
+    {
+      id: 'tux',
+      name: 'Linux 6.12',
+      tag: 'consola',
+      kind: 'serial',
+      desc: 'Kernel Linux con BusyBox: una shell de verdad con sus comandos, ' +
+            'sistema de archivos y editor vi. Arranca en un par de segundos.',
+      hint: 'Escribe directamente. Prueba uname -a, ls /, cat /proc/cpuinfo, free -m o vi hola.txt.',
+      files: [
+        { url: 'system/bzImage.bin', bytes: 5788160 },
+        { url: 'system/initrd.gz',   bytes: 2276000 }
+      ],
+      options: function (bufs) {
+        return {
+          bzimage: { buffer: bufs[0] },
+          initrd: { buffer: bufs[1] },
+          // La consola VGA de v86 se congela con este kernel: usamos la serie.
+          cmdline: 'console=ttyS0 rootfstype=ramfs tsc=reliable mitigations=off random.trust_cpu=on'
+        };
+      }
+    }
+  ];
 
   var $ = function (id) { return document.getElementById(id); };
   var el = {
-    phase: $('phase'), pack: $('pack'), stage: $('stage'), files: $('files'),
-    get: $('get'), boot: $('boot'), drop: $('drop'), progress: $('progress'),
-    bar: $('bar'), barWrap: $('bar-wrap'), net: $('net'),
-    term: $('term'), input: $('mobile-input'), kbd: $('kbd'),
+    phase: $('phase'), pack: $('pack'), stage: $('stage'), list: $('systems'),
+    term: $('term'), termWrap: $('term-wrap'), screen: $('screen'), keys: $('keys'),
+    input: $('mobile-input'), kbd: $('kbd'), hint: $('hint'), net: $('net'),
     pause: $('pause'), reset: $('reset'), close: $('close')
   };
 
   var mb = function (n) { return (n / 1048576).toFixed(1) + ' MB'; };
+  var runtimeBytes = RUNTIME.reduce(function (n, f) { return n + f.bytes; }, 0);
   var emulator = null;
   var term = null;
+  var current = null;
 
-  /* ---------- lista de archivos ---------- */
-
-  PACK.forEach(function (f) {
-    var li = document.createElement('li');
-    li.innerHTML = '<span></span><b></b>';
-    li.firstChild.textContent = f.label;
-    li.lastChild.textContent = mb(f.bytes);
-    li.lastChild.setAttribute('data-for', f.url);
-    el.files.appendChild(li);
-  });
-
-  function mark(url, text, done) {
-    var b = el.files.querySelector('[data-for="' + url + '"]');
-    if (!b) return;
-    b.textContent = text;
-    b.parentNode.classList.toggle('done', !!done);
+  function totalBytes(sys) {
+    return sys.files.reduce(function (n, f) { return n + f.bytes; }, 0) + runtimeBytes;
   }
 
   function setPhase(text, on) {
@@ -49,38 +75,80 @@
     el.phase.classList.toggle('on', !!on);
   }
 
-  /* ---------- estado de la descarga ---------- */
+  /* ---------- fichas ---------- */
 
-  function cached() {
-    if (!('caches' in window)) return Promise.resolve([]);
+  SYSTEMS.forEach(function (sys) {
+    var li = document.createElement('li');
+    li.className = 'card';
+    li.innerHTML =
+      '<div class="card-head">' +
+        '<b class="card-name"></b>' +
+        '<span class="tag"></span>' +
+        '<span class="card-size"></span>' +
+      '</div>' +
+      '<p class="card-desc"></p>' +
+      '<div class="bar" hidden><div class="bar-fill"></div></div>' +
+      '<p class="card-state"></p>' +
+      '<div class="card-actions">' +
+        '<button class="btn primary small" data-act="get"></button>' +
+        '<button class="btn ghost small" data-act="boot">Arrancar</button>' +
+        '<button class="btn ghost small" data-act="drop" hidden>Borrar</button>' +
+      '</div>';
+    li.querySelector('.card-name').textContent = sys.name;
+    li.querySelector('.tag').textContent = sys.tag;
+    li.querySelector('.card-size').textContent = mb(totalBytes(sys));
+    li.querySelector('.card-desc').textContent = sys.desc;
+    li.querySelector('[data-act="get"]').textContent = 'Descargar ' + mb(totalBytes(sys));
+    el.list.appendChild(li);
+
+    sys.el = {
+      card: li,
+      bar: li.querySelector('.bar-fill'),
+      barWrap: li.querySelector('.bar'),
+      state: li.querySelector('.card-state'),
+      get: li.querySelector('[data-act="get"]'),
+      boot: li.querySelector('[data-act="boot"]'),
+      drop: li.querySelector('[data-act="drop"]')
+    };
+    sys.el.get.addEventListener('click', function () { fetchSystem(sys); });
+    sys.el.boot.addEventListener('click', function () { boot(sys); });
+    sys.el.drop.addEventListener('click', function () { drop(sys); });
+  });
+
+  /* ---------- estado en caché ---------- */
+
+  function need(sys) { return RUNTIME.concat(sys.files); }
+
+  function missing(sys) {
+    if (!('caches' in window)) return Promise.resolve(need(sys));
     return caches.open(CACHE).then(function (c) {
-      return Promise.all(PACK.map(function (f) {
-        return c.match(f.url).then(function (hit) { return hit ? f.url : null; });
+      return Promise.all(need(sys).map(function (f) {
+        return c.match(f.url).then(function (hit) { return hit ? null : f; });
       }));
     }).then(function (list) { return list.filter(Boolean); });
   }
 
-  function refresh() {
-    return cached().then(function (have) {
-      var all = have.length === PACK.length;
-      PACK.forEach(function (f) {
-        if (have.indexOf(f.url) >= 0) mark(f.url, 'guardado', true);
-      });
-      el.boot.disabled = !all;
-      el.drop.hidden = have.length === 0;
-      el.get.hidden = all;
-      if (all) {
-        setPhase('Guardado — listo sin conexión', true);
-        el.progress.textContent = 'Sistema guardado en el dispositivo (' + mb(TOTAL) + '). Ya no hace falta internet.';
-      } else if (have.length) {
-        setPhase('Descarga incompleta');
-        el.progress.textContent = 'Faltan archivos: vuelve a pulsar descargar.';
-      }
-      return all;
+  function refresh(sys) {
+    return missing(sys).then(function (left) {
+      var ready = left.length === 0;
+      sys.el.boot.disabled = !ready;
+      sys.el.get.hidden = ready;
+      sys.el.drop.hidden = !ready;
+      sys.el.card.classList.toggle('ready', ready);
+      sys.el.state.textContent = ready ? 'Guardado — funciona sin conexión' : '';
+      return ready;
     });
   }
 
-  /* ---------- descarga con progreso ---------- */
+  function refreshAll() {
+    return Promise.all(SYSTEMS.map(refresh)).then(function (states) {
+      var ready = states.filter(Boolean).length;
+      if (ready) setPhase(ready + (ready > 1 ? ' sistemas listos' : ' sistema listo') + ' sin conexión', true);
+      else setPhase('Elige un sistema');
+    });
+  }
+
+  /* ---------- descarga ---------- */
 
   function download(file, onChunk) {
     return fetch(file.url, { cache: 'reload' }).then(function (res) {
@@ -106,53 +174,61 @@
     });
   }
 
-  el.get.addEventListener('click', function () {
+  function fetchSystem(sys) {
     if (!('caches' in window)) {
-      el.progress.textContent = 'Este navegador no puede guardar el sistema (falta Cache Storage).';
+      sys.el.state.textContent = 'Este navegador no puede guardar sistemas (falta Cache Storage).';
       return;
     }
-    el.get.disabled = true;
-    el.barWrap.hidden = false;
-    setPhase('Descargando…');
-    var got = 0;
-    caches.open(CACHE).then(function (cache) {
-      return PACK.reduce(function (chain, f) {
-        return chain.then(function () {
-          mark(f.url, 'descargando…');
-          return download(f, function (n) {
-            got += n;
-            var pct = Math.min(100, got / TOTAL * 100);
-            el.bar.style.width = pct.toFixed(1) + '%';
-            el.progress.textContent = mb(got) + ' de ' + mb(TOTAL) + ' (' + pct.toFixed(0) + '%)';
-          }).then(function (buf) {
-            return cache.put(f.url, new Response(buf));
-          }).then(function () {
-            mark(f.url, 'guardado', true);
-          });
-        });
-      }, Promise.resolve());
-    }).then(function () {
-      el.bar.style.width = '100%';
-      return refresh();
-    }).catch(function (err) {
-      setPhase('Error en la descarga');
-      el.progress.textContent = 'No se pudo descargar todo: ' + err.message + '. Reintenta con conexión.';
-    }).then(function () {
-      el.get.disabled = false;
-    });
-  });
+    sys.el.get.disabled = true;
+    sys.el.barWrap.hidden = false;
+    setPhase('Descargando ' + sys.name + '…');
 
-  el.drop.addEventListener('click', function () {
-    caches.delete(CACHE).then(function () {
-      PACK.forEach(function (f) { mark(f.url, mb(f.bytes), false); });
-      el.bar.style.width = '0';
-      el.get.hidden = false;
-      el.drop.hidden = true;
-      el.boot.disabled = true;
-      setPhase('Sin descargar');
-      el.progress.textContent = 'Borrado. Pesa unos 10 MB en total.';
+    missing(sys).then(function (left) {
+      var total = left.reduce(function (n, f) { return n + f.bytes; }, 0) || 1;
+      var got = 0;
+      return caches.open(CACHE).then(function (cache) {
+        return left.reduce(function (chain, f) {
+          return chain.then(function () {
+            return download(f, function (n) {
+              got += n;
+              var pct = Math.min(100, got / total * 100);
+              sys.el.bar.style.width = pct.toFixed(1) + '%';
+              sys.el.state.textContent = mb(got) + ' de ' + mb(total) + ' (' + pct.toFixed(0) + '%)';
+            }).then(function (buf) {
+              return cache.put(f.url, new Response(buf));
+            });
+          });
+        }, Promise.resolve());
+      });
+    }).then(function () {
+      sys.el.bar.style.width = '100%';
+      return refreshAll();
+    }).catch(function (err) {
+      sys.el.state.textContent = 'No se pudo descargar: ' + err.message + '. Reintenta con conexión.';
+      setPhase('Error en la descarga');
+    }).then(function () {
+      sys.el.get.disabled = false;
     });
-  });
+  }
+
+  function drop(sys) {
+    caches.open(CACHE).then(function (cache) {
+      // El runtime lo comparten todos: solo se borra si no queda nadie más.
+      var others = SYSTEMS.filter(function (s) { return s !== sys; });
+      return Promise.all(others.map(function (s) {
+        return missing(s).then(function (left) { return left.length === 0; });
+      })).then(function (readyOthers) {
+        var files = sys.files.slice();
+        if (readyOthers.indexOf(true) < 0) files = files.concat(RUNTIME);
+        return Promise.all(files.map(function (f) { return cache.delete(f.url); }));
+      });
+    }).then(function () {
+      sys.el.bar.style.width = '0';
+      sys.el.barWrap.hidden = true;
+      sys.el.state.textContent = '';
+      return refreshAll();
+    });
+  }
 
   /* ---------- arranque ---------- */
 
@@ -163,45 +239,62 @@
                .then(function (res) { return res.arrayBuffer(); });
   }
 
-  el.boot.addEventListener('click', function () {
-    el.boot.disabled = true;
-    setPhase('Cargando en memoria…');
-    Promise.all([load('system/bzImage.bin'), load('system/initrd.gz')]).then(function (parts) {
+  function boot(sys) {
+    sys.el.boot.disabled = true;
+    setPhase('Cargando ' + sys.name + '…');
+
+    Promise.all(sys.files.map(function (f) { return load(f.url); })).then(function (bufs) {
+      current = sys;
       el.pack.hidden = true;
       el.stage.hidden = false;
-      setPhase('Arrancando…');
+      el.hint.textContent = sys.hint;
 
-      term = new Term(el.term, 80, 26);
-      var Emu = window.V86 || window.V86Starter;
-      emulator = new Emu({
+      var graphical = sys.kind === 'graphical';
+      el.screen.hidden = !graphical;
+      el.termWrap.hidden = graphical;
+      el.keys.hidden = graphical;
+      setPhase('Arrancando ' + sys.name + '…');
+
+      var opts = {
         wasm_path: 'vendor/v86.wasm',
         memory_size: 128 * 1024 * 1024,
-        vga_memory_size: 2 * 1024 * 1024,
+        vga_memory_size: 8 * 1024 * 1024,
         bios: { url: 'vendor/seabios.bin' },
         vga_bios: { url: 'vendor/vgabios.bin' },
-        bzimage: { buffer: parts[0] },
-        initrd: { buffer: parts[1] },
-        // La consola VGA de v86 se congela con este kernel: usamos la serie.
-        cmdline: 'console=ttyS0 rootfstype=ramfs tsc=reliable mitigations=off random.trust_cpu=on',
         disable_speaker: true,
         autostart: true
-      });
+      };
+      var extra = sys.options(bufs);
+      for (var k in extra) if (extra.hasOwnProperty(k)) opts[k] = extra[k];
 
-      var booted = false;
-      emulator.add_listener('serial0-output-byte', function (byte) {
-        term.write(byte);
-        if (!booted) { booted = true; setPhase('En marcha', true); }
-      });
-      el.term.focus();
+      if (graphical) {
+        opts.screen_container = el.screen;
+      } else {
+        term = new Term(el.term, 80, 26);
+      }
+
+      var Emu = window.V86 || window.V86Starter;
+      emulator = new Emu(opts);
+
+      if (graphical) {
+        emulator.add_listener('emulator-started', function () { setPhase('En marcha', true); });
+      } else {
+        var booted = false;
+        emulator.add_listener('serial0-output-byte', function (byte) {
+          term.write(byte);
+          if (!booted) { booted = true; setPhase('En marcha', true); }
+        });
+        el.term.focus();
+      }
       window.emulator = emulator; // útil desde la consola del navegador
     }).catch(function (err) {
       setPhase('No se pudo arrancar');
-      el.boot.disabled = false;
+      sys.el.boot.disabled = false;
       console.error(err);
     });
-  });
+  }
 
-  /* ---------- teclado ---------- */
+  /* ---------- teclado de los sistemas de consola ---------- */
 
   // El puerto serie emulado no tiene cola: si le metemos las teclas de golpe
   // (teclear rápido, pegar texto) se pierden bytes. Las soltamos de una en una.
@@ -209,7 +302,7 @@
   var drain = null;
 
   function send(text) {
-    if (!emulator || !text) return;
+    if (!emulator || !text || !current || current.kind !== 'serial') return;
     pending += text;
     if (drain) return;
     drain = setInterval(function () {
@@ -224,7 +317,8 @@
   }
 
   document.addEventListener('keydown', function (e) {
-    if (!emulator || el.stage.hidden) return;
+    // En los sistemas gráficos el teclado lo gestiona el propio v86.
+    if (!emulator || el.stage.hidden || !current || current.kind !== 'serial') return;
     if (e.metaKey || e.altKey) return;
     if (e.ctrlKey && (e.key === 'c' || e.key === 'v') && window.getSelection().toString()) return;
     var bytes = Term.keyToBytes(e);
@@ -264,7 +358,7 @@
 
   el.reset.addEventListener('click', function () {
     if (!emulator) return;
-    term.reset();
+    if (term) term.reset();
     emulator.restart();
     setPhase('Reiniciando…');
   });
@@ -277,7 +371,8 @@
     el.stage.hidden = true;
     el.pack.hidden = false;
     el.pause.textContent = 'Pausar';
-    refresh();
+    current = null;
+    refreshAll();
   });
 
   /* ---------- red ---------- */
@@ -292,5 +387,5 @@
   net();
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');
-  refresh();
+  refreshAll();
 })();

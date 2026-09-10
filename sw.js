@@ -1,5 +1,5 @@
 /* Service worker: guarda el juego entero para poder abrirlo sin conexión. */
-var VERSION = 'orbita-v3';
+var VERSION = 'orbita-v4';
 // La caché del pack de Linux se gestiona desde la página y no se borra aquí.
 var KEEP = [VERSION, 'orbita-linux-v1'];
 var ASSETS = [

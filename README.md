@@ -6,8 +6,9 @@ en el dispositivo, así que después puedes abrirla y jugar sin internet (inclus
 Trae dos cosas:
 
 - **Órbita**, un arcade espacial en canvas.
-- **`/linux/`**, un **Linux 6.12 de verdad** arrancando en el navegador sobre el emulador
-  **v86**, que también se descarga para usarlo sin conexión.
+- **`/linux/`**, un catálogo de **sistemas operativos de verdad** arrancando en el navegador
+  sobre el emulador **v86**: un Linux 6.12 de consola y el escritorio gráfico KolibriOS.
+  Cada uno se descarga aparte y funciona sin conexión.
 
 ![Menú del juego](docs/menu.png)
 
@@ -54,15 +55,25 @@ instalación y el modo offline funcionan directamente.
 - Para publicar cambios, sube el número de `VERSION` en `sw.js`: el nuevo service worker
   vuelve a descargar todo y borra la caché antigua.
 
-## Linux dentro del navegador (`/linux/`)
+## Sistemas dentro del navegador (`/linux/`)
 
-**v86** emula un PC x86 traduciendo su código máquina a WebAssembly, y sobre él arranca un
-kernel **Linux 6.12** con **BusyBox**. Como son archivos estáticos, el service worker los
-guarda igual que el resto: se descargan una vez y luego arrancan **sin red**.
+**v86** emula un PC x86 traduciendo su código máquina a WebAssembly. Como todo son archivos
+estáticos, se guardan en Cache Storage y luego arrancan **sin red**.
 
-- Pack de **10 MB** (emulador 2,1 MB + BIOS + kernel 5,6 MB + sistema de archivos 2,2 MB),
-  con barra de progreso, botón para borrarlo y aviso de lo que ya está guardado.
-- Arranca a una shell en **1-2 segundos** con red y en unos **8 segundos** sin ella.
+| Sistema | Peso | Qué es |
+| --- | --- | --- |
+| **KolibriOS** | 3,6 MB | Escritorio gráfico a 1024×768, con ratón, apps y juegos, en un disquete de 1,44 MB |
+| **Linux 6.12** | 10 MB | Consola con BusyBox: shell, sistema de archivos y `vi` |
+
+Cada ficha se descarga por separado, con barra de progreso y botón para borrarla; el
+emulador y las BIOS (2,3 MB) se comparten y solo se borran cuando no queda ningún sistema.
+
+- KolibriOS llega al escritorio en unos **10 s** y Linux a la shell en **1-2 s** (más lento
+  sin red la primera vez, porque hay que leerlo todo de la caché).
+- Los sistemas gráficos usan el canvas de v86 con **teclado y ratón**; ojo, el ratón es
+  **relativo**, así que el cursor de dentro no coincide con el de fuera (como en cualquier
+  máquina virtual sin puntero absoluto).
+- Los de consola usan el puerto serie y `term.js`.
 - La consola sale por el **puerto serie** y la dibuja `term.js`, un terminal VT100 propio
   (cursor, regiones de scroll y secuencias ANSI), suficiente para `vi`, `top` o `less`.
   Se usa la serie porque la consola VGA de v86 se congela con este kernel.
@@ -73,7 +84,10 @@ guarda igual que el resto: se descargan una vez y luego arrancan **sin red**.
 El sistema de archivos original pesaba 33 MB; está recortado a 2,2 MB dejando BusyBox,
 la glibc y poco más (fuera git, X11, CUPS, sqlite, Node, Python…). Los binarios son GPL:
 `linux/system/THIRD_PARTY_NOTICES.md` y `linux/system/SOURCE_OFFER.md` viajan con ellos y
-**hay que mantenerlos** si redistribuyes esto. La imagen viene del paquete npm
+**hay que mantenerlos** si redistribuyes esto. KolibriOS (`linux/system/kolibri.img`) es la imagen de disquete sin modificar, tomada de un
+espejo del proyecto; sus datos y licencia están en `linux/system/KOLIBRIOS.md`.
+
+La imagen de Linux viene del paquete npm
 [`sharjeenux`](https://www.npmjs.com/package/sharjeenux) (MIT su envoltorio, GPL/LGPL lo
 de dentro) y v86 es BSD-2-Clause.
 
@@ -100,7 +114,7 @@ offline sin descargas extra.
 | `linux/index.html` · `boot.js` | Página del emulador: descarga del pack y arranque |
 | `linux/term.js` | Terminal VT100 que dibuja la consola de la máquina virtual |
 | `linux/vendor/` | v86 (emulador y BIOS) |
-| `linux/system/` | Kernel Linux, sistema de archivos y avisos de licencia |
+| `linux/system/` | Kernel Linux, KolibriOS y avisos de licencia |
 | `serve.py` | Servidor local con los tipos MIME correctos (sobre todo en Windows) |
 | `manifest.webmanifest` | Nombre, iconos y colores de la app instalada |
 | `icons/` | Iconos de la app (incluye uno *maskable* para Android) |
