@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Órbita — juego offline</title>
+<meta name="description" content="Arcade espacial instalable que funciona sin conexión.">
+<meta name="theme-color" content="#0b0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Órbita">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header class="hud">
+    <div class="hud-group">
+      <span class="stat"><b id="score">0</b><small>puntos</small></span>
+      <span class="stat"><b id="best">0</b><small>récord</small></span>
+      <span class="stat"><b id="wave">1</b><small>oleada</small></span>
+    </div>
+    <div class="hud-group">
+      <span id="lives" class="lives" aria-label="vidas"></span>
+      <button id="sound" class="icon-btn" type="button" aria-pressed="true" title="Sonido">♪</button>
+    </div>
+  </header>
+
+  <canvas id="game" aria-label="Área de juego"></canvas>
+
+  <div id="overlay" class="overlay">
+    <div class="panel">
+      <h1 class="logo">ÓRBITA</h1>
+      <p id="tagline" class="tagline">Esquiva, dispara, sobrevive. Sin conexión.</p>
+      <p id="result" class="result" hidden></p>
+      <button id="play" class="btn primary" type="button">Jugar</button>
+      <p class="controls">
+        <span class="k">←</span><span class="k">→</span> o <span class="k">A</span><span class="k">D</span> para moverte ·
+        <span class="k">espacio</span> para disparar · <span class="k">P</span> pausa<br>
+        En móvil: arrastra para moverte, dispara solo.
+      </p>
+
+      <section id="install-card" class="install">
+        <div class="install-head">
+          <span id="offline-dot" class="dot"></span>
+          <strong id="offline-state">Preparando modo offline…</strong>
+        </div>
+        <p id="install-text" class="install-text">Instálalo para jugar sin conexión, incluso en modo avión.</p>
+        <button id="install" class="btn ghost" type="button" hidden>Instalar para jugar offline</button>
+        <button id="download" class="btn ghost" type="button">Descargar contenido offline</button>
+        <details id="ios-help" hidden>
+          <summary>Cómo instalarlo en iPhone / iPad</summary>
+          <p>Abre el menú <b>Compartir</b> de Safari y elige <b>Añadir a pantalla de inicio</b>.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</div>
+<script src="game.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

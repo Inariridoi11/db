@@ -1,0 +1,19 @@
+{
+  "name": "Órbita — arcade offline",
+  "short_name": "Órbita",
+  "description": "Arcade espacial instalable que funciona sin conexión.",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070812",
+  "theme_color": "#0b0e1a",
+  "lang": "es",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
