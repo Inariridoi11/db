@@ -18,9 +18,14 @@ Trae dos cosas:
 Necesita **HTTPS o localhost** (es un requisito de los service workers; con `file://` no funciona).
 
 ```bash
-python3 -m http.server 8000
-# abre http://localhost:8000
+python3 serve.py
+# Órbita en http://localhost:8000 y Linux en http://localhost:8000/linux/
 ```
+
+Usa `serve.py` y no `python -m http.server`: en Windows, el módulo estándar saca los
+tipos MIME del registro, donde `.css` y `.js` suelen estar como `text/plain`. Con ese tipo
+el navegador **ignora la hoja de estilos** (la web sale sin diseño) y **se niega a registrar
+el service worker**, así que tampoco hay modo offline. `serve.py` los fija a mano.
 
 ## Cómo publicarla en GitHub Pages
 
@@ -93,5 +98,6 @@ offline sin descargas extra.
 | `linux/term.js` | Terminal VT100 que dibuja la consola de la máquina virtual |
 | `linux/vendor/` | v86 (emulador y BIOS) |
 | `linux/system/` | Kernel Linux, sistema de archivos y avisos de licencia |
+| `serve.py` | Servidor local con los tipos MIME correctos (sobre todo en Windows) |
 | `manifest.webmanifest` | Nombre, iconos y colores de la app instalada |
 | `icons/` | Iconos de la app (incluye uno *maskable* para Android) |
