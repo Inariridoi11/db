@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Linux offline — v86</title>
+<meta name="description" content="Un Linux real arrancando dentro del navegador, sin conexión.">
+<meta name="theme-color" content="#0b0e1a">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="linux.css">
+</head>
+<body class="vm-page">
+<header class="vm-bar">
+  <a class="back" href="../">◀ Órbita</a>
+  <strong class="vm-title">Linux en el navegador</strong>
+  <span id="phase" class="phase">Sin descargar</span>
+</header>
+
+<main class="vm-main">
+  <section id="pack" class="pack">
+    <h1>Un Linux de verdad, dentro de la pestaña</h1>
+    <p class="lead">
+      Kernel <b>Linux 6.12</b> con BusyBox arrancando sobre <b>v86</b>, un PC x86 emulado en
+      WebAssembly. Descarga el sistema una vez y arráncalo siempre que quieras, <b>sin conexión</b>.
+    </p>
+
+    <div class="bar" hidden id="bar-wrap"><div id="bar" class="bar-fill"></div></div>
+    <p id="progress" class="progress">Pesa unos <b>10 MB</b> en total.</p>
+
+    <button id="get" class="btn primary" type="button">Descargar sistema (10 MB)</button>
+    <button id="boot" class="btn ghost" type="button" disabled>Arrancar</button>
+    <button id="drop" class="btn ghost" type="button" hidden>Borrar del dispositivo</button>
+
+    <ul class="files" id="files"></ul>
+  </section>
+
+  <section id="stage" class="stage" hidden>
+    <div id="term-wrap" class="term-wrap">
+      <pre id="term" class="term" tabindex="0" aria-label="Terminal de la máquina virtual"></pre>
+      <input id="mobile-input" class="mobile-input" autocomplete="off" autocorrect="off"
+             autocapitalize="off" spellcheck="false" aria-hidden="true">
+    </div>
+
+    <div class="keys">
+      <button class="key" data-send="&#9;">Tab</button>
+      <button class="key" data-send="&#27;">Esc</button>
+      <button class="key" data-send="&#3;">Ctrl+C</button>
+      <button class="key" data-send="&#27;[A">▲</button>
+      <button class="key" data-send="&#27;[B">▼</button>
+      <button id="kbd" class="key" type="button">Teclado</button>
+    </div>
+
+    <div class="vm-actions">
+      <button id="pause" class="btn ghost small" type="button">Pausar</button>
+      <button id="reset" class="btn ghost small" type="button">Reiniciar</button>
+      <button id="close" class="btn ghost small" type="button">Apagar</button>
+    </div>
+
+    <p class="hint">
+      Escribe directamente: las teclas van a la máquina virtual. Prueba
+      <code>uname -a</code>, <code>ls /</code>, <code>cat /proc/cpuinfo</code>,
+      <code>free -m</code>, <code>vi hola.txt</code>.
+    </p>
+  </section>
+</main>
+
+<footer class="vm-foot">
+  <span id="net" class="net"></span>
+  <a href="system/THIRD_PARTY_NOTICES.md">Licencias</a> ·
+  <a href="system/SOURCE_OFFER.md">Código fuente</a> ·
+  <a href="vendor/LICENSE-v86.txt">v86 (BSD-2)</a>
+</footer>
+
+<script src="vendor/libv86.js"></script>
+<script src="term.js"></script>
+<script src="boot.js"></script>
+</body>
+</html>

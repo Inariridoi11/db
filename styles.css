@@ -162,6 +162,9 @@ body { touch-action: none; user-select: none; }
 .dot.ready { background: #45ffa8; }
 .dot.off { background: #6b7299; box-shadow: none; }
 
+.extra { margin: 12px 0 0; font-size: 12.5px; color: var(--muted); }
+.extra a { color: var(--cyan); }
+
 details { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
 summary { cursor: pointer; }
 details p { margin: 8px 0 0; }

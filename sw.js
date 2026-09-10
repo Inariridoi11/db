@@ -1,5 +1,7 @@
 /* Service worker: guarda el juego entero para poder abrirlo sin conexión. */
-var VERSION = 'orbita-v1';
+var VERSION = 'orbita-v3';
+// La caché del pack de Linux se gestiona desde la página y no se borra aquí.
+var KEEP = [VERSION, 'orbita-linux-v1'];
 var ASSETS = [
   './',
   'index.html',
@@ -11,7 +13,13 @@ var ASSETS = [
   'icons/icon-512.png',
   'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
-  'icons/favicon-32.png'
+  'icons/favicon-32.png',
+  'linux/',
+  'linux/index.html',
+  'linux/linux.css',
+  'linux/boot.js',
+  'linux/term.js',
+  'linux/vendor/libv86.js'
 ];
 
 function urls() {
@@ -47,7 +55,7 @@ self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(keys.map(function (k) {
-        return k === VERSION ? null : caches.delete(k);
+        return KEEP.indexOf(k) >= 0 ? null : caches.delete(k);
       }));
     }).then(function () { return self.clients.claim(); })
   );
@@ -80,10 +88,19 @@ self.addEventListener('fetch', function (e) {
         caches.open(VERSION).then(function (c) { c.put(req, copy); });
         return res;
       }).catch(function () {
-        var shell = new URL('index.html', self.registration.scope).href;
-        return caches.match(shell).then(function (hit) {
-          return hit || caches.match(req, { ignoreSearch: true });
-        }).then(function (hit) {
+        // Primero la copia exacta de esa página (/linux/ no es la portada),
+        // luego su index.html, y solo al final la portada como último recurso.
+        var candidates = [req.url];
+        if (url.pathname.charAt(url.pathname.length - 1) === '/') {
+          candidates.push(url.origin + url.pathname + 'index.html');
+        }
+        candidates.push(new URL('index.html', self.registration.scope).href);
+
+        return candidates.reduce(function (chain, candidate) {
+          return chain.then(function (hit) {
+            return hit || caches.match(candidate, { ignoreSearch: true });
+          });
+        }, Promise.resolve(null)).then(function (hit) {
           return hit || new Response('Sin conexion y sin copia guardada.', {
             status: 503,
             headers: { 'Content-Type': 'text/plain; charset=utf-8' }
