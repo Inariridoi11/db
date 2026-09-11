@@ -95,6 +95,12 @@ elección. Como no se sabe de antemano cómo va a pintar una
 imagen ajena, se muestra el canvas y, si además habla por el puerto serie, aparece el terminal
 debajo.
 
+Si otra pestaña de la web tiene abierta una versión anterior de la base de datos, la
+actualización de IndexedDB se queda bloqueada y las peticiones **no responden ni con éxito ni
+con error**. Por eso `store.js` pone un plazo y atiende `onblocked`, y la página pinta las
+imágenes recién soltadas antes de consultar la base: aunque no se pueda guardar nada, la
+imagen se arranca igual y se avisa de que hay que cerrar las otras pestañas.
+
 Aquí entran Tiny Core (X11), FreeDOS o cualquier distro de 32 bits: te la bajas tú y la
 sueltas. Con lo gordo, cuenta con que irá lento.
 

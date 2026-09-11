@@ -369,7 +369,7 @@
   var states = {};
 
   function refreshStates() {
-    return StateStore.listar().then(function (list) {
+    return StateStore.listar().catch(function () { return []; }).then(function (list) {
       states = {};
       list.forEach(function (st) { states[st.id] = st; });
       SYSTEMS.forEach(paintState);
@@ -438,6 +438,12 @@
     }, Promise.resolve());
   }
 
+  function warnStore(err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    el.importState.textContent = 'Aviso: ' + msg + '. Las imágenes sueltas siguen funcionando ' +
+      'en esta sesión.';
+  }
+
   function persist(rec, quiet) {
     if (!ImageStore.disponible) {
       el.importState.textContent = 'Este navegador no puede guardar imágenes (falta IndexedDB).';
@@ -477,7 +483,16 @@
   }
 
   function renderMine() {
-    return ImageStore.listar().then(function (stored) {
+    // Lo que acabas de soltar se pinta ya, sin esperar a la base de datos: si
+    // está bloqueada por otra pestaña, la imagen se usa igual.
+    paintMine([]);
+    return ImageStore.listar().catch(function (err) {
+      warnStore(err);
+      return [];
+    }).then(paintMine);
+  }
+
+  function paintMine(stored) {
       // Lo guardado en el dispositivo, más lo que acabas de soltar en esta
       // sesión y todavía no se ha copiado.
       var recs = stored.map(function (r) { r.stored = true; return r; });
@@ -559,7 +574,6 @@
         });
         el.mine.appendChild(li);
       });
-    });
   }
 
   function bootImported(sys, state) {

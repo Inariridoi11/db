@@ -8,22 +8,63 @@
   'use strict';
 
   var DB = 'orbita-vm';
+  var VERSION = 2;
   var IMAGES = 'images';
   var STATES = 'states';
+  var TIMEOUT = 6000;
   var db = null;
 
   function open() {
     if (db) return Promise.resolve(db);
     return new Promise(function (resolve, reject) {
-      if (!global.indexedDB) return reject(new Error('sin IndexedDB'));
-      var req = indexedDB.open(DB, 2);
+      if (!global.indexedDB) return reject(new Error('este navegador no tiene IndexedDB'));
+
+      var settled = false;
+      function fail(msg) {
+        if (settled) return;
+        settled = true;
+        reject(new Error(msg));
+      }
+
+      // Si otra pestaña tiene abierta una versión anterior, la actualización se
+      // queda bloqueada y la petición no responde ni con éxito ni con error.
+      // Sin este plazo, la página esperaría para siempre.
+      var timer = setTimeout(function () {
+        fail('la base de datos no responde; cierra las demás pestañas de esta web y recarga');
+      }, TIMEOUT);
+
+      var req = indexedDB.open(DB, VERSION);
+
       req.onupgradeneeded = function () {
         var d = req.result;
         if (!d.objectStoreNames.contains(IMAGES)) d.createObjectStore(IMAGES, { keyPath: 'id' });
         if (!d.objectStoreNames.contains(STATES)) d.createObjectStore(STATES, { keyPath: 'id' });
       };
-      req.onsuccess = function () { db = req.result; resolve(db); };
-      req.onerror = function () { reject(req.error); };
+
+      req.onblocked = function () {
+        clearTimeout(timer);
+        fail('hay otra pestaña de esta web abierta con una versión anterior: ciérrala y recarga');
+      };
+
+      req.onsuccess = function () {
+        clearTimeout(timer);
+        var d = req.result;
+        // Si otra pestaña actualiza la base, soltamos la conexión para no
+        // bloquearla a ella igual que nos bloquearon a nosotros.
+        d.onversionchange = function () {
+          d.close();
+          if (db === d) db = null;
+        };
+        if (settled) { d.close(); return; }
+        settled = true;
+        db = d;
+        resolve(d);
+      };
+
+      req.onerror = function () {
+        clearTimeout(timer);
+        fail((req.error && req.error.message) || 'no se pudo abrir la base de datos');
+      };
     });
   }
 
@@ -44,10 +85,10 @@
       guardar: function (rec) { return tx(store, 'readwrite', function (s) { return s.put(rec); }); },
       obtener: function (id) { return tx(store, 'readonly', function (s) { return s.get(id); }); },
       borrar: function (id) { return tx(store, 'readwrite', function (s) { return s.delete(id); }); },
+      // Los errores se propagan a propósito: quien llama decide qué enseñar.
       listar: function () {
         return tx(store, 'readonly', function (s) { return s.getAll(); })
-          .then(function (list) { return list || []; })
-          .catch(function () { return []; });
+          .then(function (list) { return list || []; });
       }
     };
   }
