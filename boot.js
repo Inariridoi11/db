@@ -58,7 +58,7 @@
     mine: $('mine'), drop: $('drop'), file: $('file'), importState: $('import-state'),
     term: $('term'), termWrap: $('term-wrap'), screen: $('screen'), keys: $('keys'),
     input: $('mobile-input'), kbd: $('kbd'), hint: $('hint'), net: $('net'),
-    pause: $('pause'), reset: $('reset'), close: $('close'), full: $('full')
+    pause: $('pause'), reset: $('reset'), close: $('close'), full: $('full'), save: $('save')
   };
 
   var mb = function (n) { return (n / 1048576).toFixed(1) + ' MB'; };
@@ -95,6 +95,8 @@
       '<div class="card-actions">' +
         '<button class="btn primary small" data-act="get"></button>' +
         '<button class="btn ghost small" data-act="boot">Arrancar</button>' +
+        '<button class="btn ghost small" data-act="restore" hidden></button>' +
+        '<button class="btn ghost small" data-act="forget" hidden>Olvidar estado</button>' +
         '<button class="btn ghost small" data-act="drop" hidden>Borrar</button>' +
       '</div>';
     li.querySelector('.card-name').textContent = sys.name;
@@ -111,11 +113,17 @@
       state: li.querySelector('.card-state'),
       get: li.querySelector('[data-act="get"]'),
       boot: li.querySelector('[data-act="boot"]'),
-      drop: li.querySelector('[data-act="drop"]')
+      drop: li.querySelector('[data-act="drop"]'),
+      restore: li.querySelector('[data-act="restore"]'),
+      forget: li.querySelector('[data-act="forget"]')
     };
     sys.el.get.addEventListener('click', function () { fetchSystem(sys); });
     sys.el.boot.addEventListener('click', function () { boot(sys); });
     sys.el.drop.addEventListener('click', function () { drop(sys); });
+    sys.el.restore.addEventListener('click', function () { boot(sys, states[sys.id]); });
+    sys.el.forget.addEventListener('click', function () {
+      StateStore.borrar(sys.id).then(refreshStates);
+    });
   });
 
   /* ---------- estado en caché ---------- */
@@ -139,6 +147,8 @@
       sys.el.drop.hidden = !ready;
       sys.el.card.classList.toggle('ready', ready);
       sys.el.state.textContent = ready ? 'Guardado — funciona sin conexión' : '';
+      if (!ready) { sys.el.restore.hidden = true; sys.el.forget.hidden = true; }
+      else paintState(sys);
       return ready;
     });
   }
@@ -242,11 +252,11 @@
                .then(function (res) { return res.arrayBuffer(); });
   }
 
-  function boot(sys) {
+  function boot(sys, state) {
     sys.el.boot.disabled = true;
     setPhase('Cargando ' + sys.name + '…');
     Promise.all(sys.files.map(function (f) { return load(f.url); }))
-      .then(function (bufs) { bootWith(sys, bufs); })
+      .then(function (bufs) { return withState(sys, bufs, state); })
       .catch(function (err) {
         setPhase('No se pudo arrancar');
         sys.el.boot.disabled = false;
@@ -254,7 +264,16 @@
       });
   }
 
-  function bootWith(sys, bufs) {
+  // Si hay estado guardado, se lo pasamos a v86 como imagen inicial: la máquina
+  // aparece tal y como la dejaste, sin repetir el arranque.
+  function withState(sys, bufs, state) {
+    if (!state) return bootWith(sys, bufs);
+    return state.blob.arrayBuffer().then(function (buf) {
+      bootWith(sys, bufs, buf);
+    });
+  }
+
+  function bootWith(sys, bufs, stateBuffer) {
     current = sys;
     el.pack.hidden = true;
     el.stage.hidden = false;
@@ -281,6 +300,10 @@
     var extra = sys.options(bufs);
     for (var k in extra) if (extra.hasOwnProperty(k)) opts[k] = extra[k];
     if (graphical) opts.screen_container = el.screen;
+    if (stateBuffer) {
+      opts.initial_state = { buffer: stateBuffer };
+      setPhase('Restaurando ' + sys.name + '…');
+    }
 
     // Los sistemas de consola y las imágenes importadas escuchan el serie.
     if (sys.kind !== 'graphical') term = new Term(el.term, 80, 26);
@@ -288,7 +311,7 @@
     var Emu = window.V86 || window.V86Starter;
     emulator = new Emu(opts);
 
-    if (graphical) {
+    if (graphical || stateBuffer) {
       emulator.add_listener('emulator-started', function () { setPhase('En marcha', true); });
     }
     if (term) {
@@ -305,6 +328,65 @@
     }
     window.emulator = emulator; // útil desde la consola del navegador
   }
+
+
+  /* ---------- estados guardados ---------- */
+
+  // Arrancar un escritorio pesado cuesta minutos; restaurarlo, un par de
+  // segundos. El estado es una foto de la RAM y de los dispositivos.
+  function saveState() {
+    if (!emulator || !current) return;
+    if (!StateStore.disponible) {
+      setPhase('Este navegador no puede guardar estados');
+      return;
+    }
+    var sys = current;
+    var running = emulator.is_running();
+    el.save.disabled = true;
+    setPhase('Guardando estado…');
+    if (running) emulator.stop();
+
+    emulator.save_state().then(function (buf) {
+      return StateStore.guardar({
+        id: sys.id,
+        name: sys.name,
+        size: buf.byteLength,
+        saved: Date.now(),
+        blob: new Blob([buf])
+      });
+    }).then(function () {
+      setPhase('Estado guardado', true);
+      return refreshStates();
+    }).catch(function (err) {
+      setPhase('No se pudo guardar el estado');
+      console.error(err);
+    }).then(function () {
+      if (running && emulator) emulator.run();
+      el.save.disabled = false;
+    });
+  }
+
+  var states = {};
+
+  function refreshStates() {
+    return StateStore.listar().then(function (list) {
+      states = {};
+      list.forEach(function (st) { states[st.id] = st; });
+      SYSTEMS.forEach(paintState);
+      return renderMine();
+    });
+  }
+
+  function paintState(sys) {
+    if (!sys.el || !sys.el.restore) return;
+    var st = states[sys.id];
+    sys.el.restore.hidden = !st;
+    sys.el.forget.hidden = !st;
+    if (st) sys.el.restore.textContent = 'Restaurar estado (' + mb(st.size) + ')';
+  }
+
+  if (el.save) el.save.addEventListener('click', saveState);
+
 
   /* ---------- imágenes importadas por el usuario ---------- */
 
@@ -383,12 +465,15 @@
           '<p class="card-state">Guardada en el dispositivo — funciona sin conexión</p>' +
           '<div class="card-actions">' +
             '<button class="btn primary small" data-act="boot">Arrancar</button>' +
+            '<button class="btn ghost small" data-act="restore" hidden></button>' +
+            '<button class="btn ghost small" data-act="forget" hidden>Olvidar estado</button>' +
             '<label class="mem">RAM ' +
               '<select data-act="mem">' +
                 '<option value="128">128 MB</option>' +
                 '<option value="256">256 MB</option>' +
                 '<option value="512">512 MB</option>' +
                 '<option value="1024">1 GB</option>' +
+                '<option value="2048">2 GB (puede no caber)</option>' +
               '</select></label>' +
             '<button class="btn ghost small" data-act="drop">Borrar</button>' +
           '</div>';
@@ -402,10 +487,23 @@
           rec.memory = sys.memory;
           ImageStore.guardar(rec);   // recordamos la elección para la próxima
         });
+        sys.el = { boot: li.querySelector('[data-act="boot"]') };
         li.querySelector('[data-act="boot"]').addEventListener('click', function () {
-          sys.el = { boot: li.querySelector('[data-act="boot"]') };
           bootImported(sys);
         });
+
+        var st = states[rec.id];
+        var restore = li.querySelector('[data-act="restore"]');
+        var forget = li.querySelector('[data-act="forget"]');
+        if (st) {
+          restore.hidden = false;
+          forget.hidden = false;
+          restore.textContent = 'Restaurar estado (' + mb(st.size) + ')';
+          restore.addEventListener('click', function () { bootImported(sys, st); });
+          forget.addEventListener('click', function () {
+            StateStore.borrar(rec.id).then(refreshStates);
+          });
+        }
         li.querySelector('[data-act="drop"]').addEventListener('click', function () {
           ImageStore.borrar(rec.id).then(renderMine);
         });
@@ -414,7 +512,7 @@
     });
   }
 
-  function bootImported(sys) {
+  function bootImported(sys, state) {
     sys.el.boot.disabled = true;
     setPhase('Cargando ' + sys.name + '…');
     // El emulador tiene que estar descargado aunque la imagen sea tuya.
@@ -428,7 +526,7 @@
       }
       return sys.record.blob.arrayBuffer();
     }).then(function (buf) {
-      bootWith(sys, [buf]);
+      return withState(sys, [buf], state);
     }).catch(function (err) {
       setPhase('No se pudo arrancar');
       sys.el.boot.disabled = false;
@@ -583,5 +681,5 @@
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   refreshAll();
-  renderMine();
+  refreshStates();
 })();

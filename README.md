@@ -70,11 +70,22 @@ aceleración gráfica: da para sistemas ligeros, no para escritorios modernos.
 - En móvil, un campo invisible saca el teclado del sistema, y hay botones de Tab, Esc,
   Ctrl+C y flechas.
 
+### Guardar y restaurar el estado
+
+Arrancar un escritorio pesado cuesta minutos; restaurarlo, un par de segundos. El botón
+**Guardar estado** hace una foto de la RAM y de los dispositivos (`save_state` de v86) y la
+mete en IndexedDB; la ficha del sistema pasa entonces a ofrecer **Restaurar estado**, que
+arranca la máquina con esa foto como `initial_state`.
+
+Medido aquí: Linux pasa de **7,6 s a 0,5 s** (estado de 42 MB) y KolibriOS de **22 s a 0,2 s**
+(15 MB). Los estados también funcionan sin conexión, y se borran con *Olvidar estado*.
+
 ### Importar tus propias imágenes
 
 El medio se elige por el archivo: `.iso` → CD-ROM, `.img` de hasta 2,88 MB → disquete, el
 resto → disco duro; v86 decide solo el orden de arranque. Cada imagen tiene su **selector de
-RAM** (128 MB a 1 GB) y recuerda la elección. Como no se sabe de antemano cómo va a pintar una
+RAM** (de 128 MB a 2 GB; v86 es de 32 bits, así que de ahí no se pasa) y recuerda la
+elección. Como no se sabe de antemano cómo va a pintar una
 imagen ajena, se muestra el canvas y, si además habla por el puerto serie, aparece el terminal
 debajo.
 
@@ -99,7 +110,7 @@ sueltas. Con lo gordo, cuenta con que irá lento.
 | `index.html` · `styles.css` | La página: catálogo de sistemas y pantalla de la máquina |
 | `boot.js` | Descarga de sistemas, importación y arranque de v86 |
 | `term.js` | Terminal VT100 que dibuja la consola por el puerto serie |
-| `store.js` | Guarda en IndexedDB las imágenes que importa el usuario |
+| `store.js` | IndexedDB: imágenes importadas y estados guardados de las máquinas |
 | `sw.js` | Service worker: sirve la web sin conexión |
 | `vendor/` | v86 (emulador y BIOS) |
 | `system/` | Imágenes de los sistemas y avisos de licencia |
