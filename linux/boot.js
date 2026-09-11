@@ -55,6 +55,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var el = {
     phase: $('phase'), pack: $('pack'), stage: $('stage'), list: $('systems'),
+    mine: $('mine'), drop: $('drop'), file: $('file'), importState: $('import-state'),
     term: $('term'), termWrap: $('term-wrap'), screen: $('screen'), keys: $('keys'),
     input: $('mobile-input'), kbd: $('kbd'), hint: $('hint'), net: $('net'),
     pause: $('pause'), reset: $('reset'), close: $('close')
@@ -242,55 +243,214 @@
   function boot(sys) {
     sys.el.boot.disabled = true;
     setPhase('Cargando ' + sys.name + '…');
+    Promise.all(sys.files.map(function (f) { return load(f.url); }))
+      .then(function (bufs) { bootWith(sys, bufs); })
+      .catch(function (err) {
+        setPhase('No se pudo arrancar');
+        sys.el.boot.disabled = false;
+        console.error(err);
+      });
+  }
 
-    Promise.all(sys.files.map(function (f) { return load(f.url); })).then(function (bufs) {
-      current = sys;
-      el.pack.hidden = true;
-      el.stage.hidden = false;
-      el.hint.textContent = sys.hint;
+  function bootWith(sys, bufs) {
+    current = sys;
+    el.pack.hidden = true;
+    el.stage.hidden = false;
+    el.hint.textContent = sys.hint;
 
-      var graphical = sys.kind === 'graphical';
-      el.screen.hidden = !graphical;
-      el.termWrap.hidden = graphical;
-      el.keys.hidden = graphical;
-      setPhase('Arrancando ' + sys.name + '…');
+    // De una imagen importada no sabemos cómo pinta: enseñamos el canvas y, si
+    // además habla por el puerto serie, aparece el terminal debajo.
+    var graphical = sys.kind !== 'serial';
+    el.screen.hidden = !graphical;
+    el.termWrap.hidden = sys.kind !== 'serial';
+    el.keys.hidden = sys.kind !== 'serial';
+    setPhase('Arrancando ' + sys.name + '…');
 
-      var opts = {
-        wasm_path: 'vendor/v86.wasm',
-        memory_size: 128 * 1024 * 1024,
-        vga_memory_size: 8 * 1024 * 1024,
-        bios: { url: 'vendor/seabios.bin' },
-        vga_bios: { url: 'vendor/vgabios.bin' },
-        disable_speaker: true,
-        autostart: true
-      };
-      var extra = sys.options(bufs);
-      for (var k in extra) if (extra.hasOwnProperty(k)) opts[k] = extra[k];
+    var opts = {
+      wasm_path: 'vendor/v86.wasm',
+      memory_size: (sys.memory || 128) * 1024 * 1024,
+      vga_memory_size: 8 * 1024 * 1024,
+      bios: { url: 'vendor/seabios.bin' },
+      vga_bios: { url: 'vendor/vgabios.bin' },
+      disable_speaker: true,
+      autostart: true
+    };
+    var extra = sys.options(bufs);
+    for (var k in extra) if (extra.hasOwnProperty(k)) opts[k] = extra[k];
+    if (graphical) opts.screen_container = el.screen;
 
-      if (graphical) {
-        opts.screen_container = el.screen;
-      } else {
-        term = new Term(el.term, 80, 26);
-      }
+    // Los sistemas de consola y las imágenes importadas escuchan el serie.
+    if (sys.kind !== 'graphical') term = new Term(el.term, 80, 26);
 
-      var Emu = window.V86 || window.V86Starter;
-      emulator = new Emu(opts);
+    var Emu = window.V86 || window.V86Starter;
+    emulator = new Emu(opts);
 
-      if (graphical) {
-        emulator.add_listener('emulator-started', function () { setPhase('En marcha', true); });
-      } else {
-        var booted = false;
-        emulator.add_listener('serial0-output-byte', function (byte) {
-          term.write(byte);
-          if (!booted) { booted = true; setPhase('En marcha', true); }
+    if (graphical) {
+      emulator.add_listener('emulator-started', function () { setPhase('En marcha', true); });
+    }
+    if (term) {
+      var booted = false;
+      emulator.add_listener('serial0-output-byte', function (byte) {
+        term.write(byte);
+        if (!booted) {
+          booted = true;
+          setPhase('En marcha', true);
+          if (sys.kind === 'imported') el.termWrap.hidden = false;
+        }
+      });
+      if (sys.kind === 'serial') el.term.focus();
+    }
+    window.emulator = emulator; // útil desde la consola del navegador
+  }
+
+  /* ---------- imágenes importadas por el usuario ---------- */
+
+  var FLOPPY_MAX = 2949120;       // 2,88 MB: por encima de eso no es un disquete
+  var HUGE = 400 * 1048576;       // a partir de aquí avisamos: puede no caber en memoria
+
+  function kindOf(file) {
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'iso') return 'cdrom';
+    if (file.size <= FLOPPY_MAX) return 'fda';
+    return 'hda';
+  }
+
+  var MEDIA = { fda: 'disquete', cdrom: 'CD-ROM', hda: 'disco duro' };
+
+  function importFiles(files) {
+    if (!ImageStore.disponible) {
+      el.importState.textContent = 'Este navegador no puede guardar imágenes (falta IndexedDB).';
+      return;
+    }
+    var list = Array.prototype.slice.call(files || []);
+    if (!list.length) return;
+
+    return list.reduce(function (chain, file) {
+      return chain.then(function () {
+        var kind = kindOf(file);
+        var rec = {
+          id: 'user:' + file.name,
+          name: file.name,
+          media: kind,
+          size: file.size,
+          blob: file,
+          added: Date.now()
+        };
+        el.importState.textContent = 'Guardando ' + file.name + ' (' + mb(file.size) + ')…';
+        return ImageStore.guardar(rec).then(function () {
+          el.importState.textContent = file.name + ' guardada como ' + MEDIA[kind] +
+            (file.size > HUGE ? ' — ojo, es muy grande y puede que el navegador no aguante arrancarla.' : '.');
         });
-        el.term.focus();
+      });
+    }, Promise.resolve()).then(renderMine).catch(function (err) {
+      el.importState.textContent = 'No se pudo guardar: ' + (err && err.message ? err.message : err);
+    });
+  }
+
+  function importedSystem(rec) {
+    return {
+      id: rec.id,
+      name: rec.name,
+      tag: MEDIA[rec.media],
+      kind: 'imported',
+      hint: 'Imagen tuya, arrancada como ' + MEDIA[rec.media] +
+            '. Teclado y ratón van a la máquina.',
+      files: [],
+      record: rec,
+      memory: rec.memory || 256,
+      options: function (bufs) {
+        var o = {};
+        o[rec.media] = { buffer: bufs[0] };
+        return o;   // v86 elige solo el orden de arranque según el medio
       }
-      window.emulator = emulator; // útil desde la consola del navegador
+    };
+  }
+
+  function renderMine() {
+    return ImageStore.listar().then(function (recs) {
+      el.mine.innerHTML = '';
+      recs.sort(function (a, b) { return b.added - a.added; }).forEach(function (rec) {
+        var sys = importedSystem(rec);
+        var li = document.createElement('li');
+        li.className = 'card ready';
+        li.innerHTML =
+          '<div class="card-head">' +
+            '<b class="card-name"></b><span class="tag"></span><span class="card-size"></span>' +
+          '</div>' +
+          '<p class="card-state">Guardada en el dispositivo — funciona sin conexión</p>' +
+          '<div class="card-actions">' +
+            '<button class="btn primary small" data-act="boot">Arrancar</button>' +
+            '<label class="mem">RAM ' +
+              '<select data-act="mem">' +
+                '<option value="128">128 MB</option>' +
+                '<option value="256">256 MB</option>' +
+                '<option value="512">512 MB</option>' +
+                '<option value="1024">1 GB</option>' +
+              '</select></label>' +
+            '<button class="btn ghost small" data-act="drop">Borrar</button>' +
+          '</div>';
+        li.querySelector('.card-name').textContent = rec.name;
+        li.querySelector('.tag').textContent = MEDIA[rec.media];
+        li.querySelector('.card-size').textContent = mb(rec.size);
+        var mem = li.querySelector('[data-act="mem"]');
+        mem.value = String(sys.memory);
+        mem.addEventListener('change', function () {
+          sys.memory = parseInt(mem.value, 10);
+          rec.memory = sys.memory;
+          ImageStore.guardar(rec);   // recordamos la elección para la próxima
+        });
+        li.querySelector('[data-act="boot"]').addEventListener('click', function () {
+          sys.el = { boot: li.querySelector('[data-act="boot"]') };
+          bootImported(sys);
+        });
+        li.querySelector('[data-act="drop"]').addEventListener('click', function () {
+          ImageStore.borrar(rec.id).then(renderMine);
+        });
+        el.mine.appendChild(li);
+      });
+    });
+  }
+
+  function bootImported(sys) {
+    sys.el.boot.disabled = true;
+    setPhase('Cargando ' + sys.name + '…');
+    // El emulador tiene que estar descargado aunque la imagen sea tuya.
+    var runtimeReady = ('caches' in window)
+      ? caches.open(CACHE).then(function (c) { return c.match(RUNTIME[0].url); })
+      : Promise.resolve(null);
+
+    runtimeReady.then(function (hit) {
+      if (!hit && !navigator.onLine) {
+        throw new Error('falta el emulador y no hay conexión: descarga antes cualquier sistema');
+      }
+      return sys.record.blob.arrayBuffer();
+    }).then(function (buf) {
+      bootWith(sys, [buf]);
     }).catch(function (err) {
       setPhase('No se pudo arrancar');
       sys.el.boot.disabled = false;
+      el.importState.textContent = 'Error al arrancar ' + sys.name + ': ' + err.message;
       console.error(err);
+    });
+  }
+
+  if (el.drop) {
+    el.file.addEventListener('change', function () {
+      importFiles(el.file.files);
+      el.file.value = '';
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      el.drop.addEventListener(ev, function (e) {
+        e.preventDefault();
+        el.drop.classList.add('over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      el.drop.addEventListener(ev, function (e) {
+        e.preventDefault();
+        el.drop.classList.remove('over');
+        if (ev === 'drop') importFiles(e.dataTransfer.files);
+      });
     });
   }
 
@@ -388,4 +548,5 @@
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');
   refreshAll();
+  renderMine();
 })();

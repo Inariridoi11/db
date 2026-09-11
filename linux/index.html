@@ -30,6 +30,19 @@
     <p class="foot-note">
       Se guardan en este dispositivo. Puedes borrar cualquiera y volver a descargarlo.
     </p>
+
+    <h2 class="sub">Tus imágenes</h2>
+    <p class="lead small">
+      Suelta aquí un <code>.iso</code>, un <code>.img</code> o un disco duro virtual y v86 lo
+      arranca. Se guarda en el dispositivo, así que después también funciona sin conexión.
+    </p>
+    <ul id="mine" class="systems"></ul>
+    <label id="drop" class="dropzone" for="file">
+      <b>Arrastra una imagen aquí</b>
+      <span>o pulsa para elegir un archivo · .iso, .img, .bin</span>
+      <input id="file" type="file" accept=".iso,.img,.ima,.vfd,.bin,.raw,.dsk" hidden>
+    </label>
+    <p id="import-state" class="card-state"></p>
   </section>
 
   <section id="stage" class="stage" hidden>
@@ -73,6 +86,7 @@
 
 <script src="vendor/libv86.js"></script>
 <script src="term.js"></script>
+<script src="store.js"></script>
 <script src="boot.js"></script>
 </body>
 </html>

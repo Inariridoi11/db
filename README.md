@@ -68,6 +68,23 @@ estáticos, se guardan en Cache Storage y luego arrancan **sin red**.
 Cada ficha se descarga por separado, con barra de progreso y botón para borrarla; el
 emulador y las BIOS (2,3 MB) se comparten y solo se borran cuando no queda ningún sistema.
 
+### Importar tus propias imágenes
+
+Debajo del catálogo puedes **soltar un `.iso`, un `.img` o un disco duro virtual** y v86 lo
+arranca. Se guarda en **IndexedDB** (no en Cache Storage: son archivos de cientos de MB que
+no vienen de ninguna URL) y el `Blob` se guarda tal cual, sin leerlo entero en memoria hasta
+el arranque. Después sigue ahí, también sin conexión.
+
+- El medio se elige por el archivo: `.iso` → CD-ROM, `.img` de hasta 2,88 MB → disquete,
+  el resto → disco duro. v86 decide solo el orden de arranque según el medio.
+- Cada imagen tiene su **selector de RAM** (128 MB a 1 GB) y recuerda tu elección.
+- Como no se sabe de antemano cómo pinta una imagen ajena, se muestra el canvas y, si además
+  habla por el puerto serie, aparece el terminal debajo.
+
+Aquí es donde entran Tiny Core (X11), FreeDOS o cualquier distro de 32 bits: te la bajas tú
+y la sueltas. Ojo con lo gordo: un escritorio completo son cientos de MB y va lento
+(v86 emula un solo núcleo sin 64 bits ni aceleración gráfica).
+
 - KolibriOS llega al escritorio en unos **10 s** y Linux a la shell en **1-2 s** (más lento
   sin red la primera vez, porque hay que leerlo todo de la caché).
 - Los sistemas gráficos usan el canvas de v86 con **teclado y ratón**; ojo, el ratón es
@@ -113,6 +130,7 @@ offline sin descargas extra.
 | `sw.js` | Service worker: descarga y sirve el contenido sin conexión |
 | `linux/index.html` · `boot.js` | Página del emulador: descarga del pack y arranque |
 | `linux/term.js` | Terminal VT100 que dibuja la consola de la máquina virtual |
+| `linux/store.js` | Guarda en IndexedDB las imágenes que importa el usuario |
 | `linux/vendor/` | v86 (emulador y BIOS) |
 | `linux/system/` | Kernel Linux, KolibriOS y avisos de licencia |
 | `serve.py` | Servidor local con los tipos MIME correctos (sobre todo en Windows) |
