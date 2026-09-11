@@ -83,7 +83,13 @@ Medido aquí: Linux pasa de **7,6 s a 0,5 s** (estado de 42 MB) y KolibriOS de *
 ### Importar tus propias imágenes
 
 El medio se elige por el archivo: `.iso` → CD-ROM, `.img` de hasta 2,88 MB → disquete, el
-resto → disco duro; v86 decide solo el orden de arranque. Cada imagen tiene su **selector de
+resto → disco duro; v86 decide solo el orden de arranque.
+
+La imagen **se puede arrancar en cuanto la sueltas**, sin esperar a que se copie a ningún
+sitio: se le pasa a v86 el `File` tal cual y, por encima de 256 MB, v86 lo lee **a trozos**
+en lugar de cargarlo entero en memoria. Copiar al dispositivo (que es lo que permite usarla
+sin conexión otro día) es un paso aparte: automático por debajo de 64 MB y con el botón
+*Guardar en el dispositivo* por encima, porque copiar cientos de MB tarda. Cada imagen tiene su **selector de
 RAM** (de 128 MB a 2 GB; v86 es de 32 bits, así que de ahí no se pasa) y recuerda la
 elección. Como no se sabe de antemano cómo va a pintar una
 imagen ajena, se muestra el canvas y, si además habla por el puerto serie, aparece el terminal

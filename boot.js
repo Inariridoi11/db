@@ -402,33 +402,58 @@
 
   var MEDIA = { fda: 'disquete', cdrom: 'CD-ROM', hda: 'disco duro' };
 
+  // Copiar medio giga a IndexedDB tarda y no aporta nada para usarla ya: las
+  // imágenes grandes quedan disponibles al instante y se guardan solo si lo pides.
+  var AUTO_SAVE_MAX = 64 * 1048576;
+  var session = [];
+
   function importFiles(files) {
-    if (!ImageStore.disponible) {
-      el.importState.textContent = 'Este navegador no puede guardar imágenes (falta IndexedDB).';
-      return;
-    }
     var list = Array.prototype.slice.call(files || []);
     if (!list.length) return;
 
-    return list.reduce(function (chain, file) {
-      return chain.then(function () {
-        var kind = kindOf(file);
-        var rec = {
-          id: 'user:' + file.name,
-          name: file.name,
-          media: kind,
-          size: file.size,
-          blob: file,
-          added: Date.now()
-        };
-        el.importState.textContent = 'Guardando ' + file.name + ' (' + mb(file.size) + ')…';
-        return ImageStore.guardar(rec).then(function () {
-          el.importState.textContent = file.name + ' guardada como ' + MEDIA[kind] +
-            (file.size > HUGE ? ' — ojo, es muy grande y puede que el navegador no aguante arrancarla.' : '.');
-        });
-      });
-    }, Promise.resolve()).then(renderMine).catch(function (err) {
-      el.importState.textContent = 'No se pudo guardar: ' + (err && err.message ? err.message : err);
+    list.forEach(function (file) {
+      var rec = {
+        id: 'user:' + file.name,
+        name: file.name,
+        media: kindOf(file),
+        size: file.size,
+        blob: file,
+        added: Date.now(),
+        stored: false
+      };
+      session = session.filter(function (r) { return r.id !== rec.id; });
+      session.push(rec);
+    });
+
+    el.importState.textContent = list.length === 1
+      ? list[0].name + ' lista para arrancar.'
+      : list.length + ' imágenes listas para arrancar.';
+
+    renderMine();
+
+    // Las pequeñas se guardan solas; las grandes esperan a que pulses el botón.
+    var small = session.filter(function (r) { return !r.stored && r.size <= AUTO_SAVE_MAX; });
+    return small.reduce(function (chain, rec) {
+      return chain.then(function () { return persist(rec, true); });
+    }, Promise.resolve());
+  }
+
+  function persist(rec, quiet) {
+    if (!ImageStore.disponible) {
+      el.importState.textContent = 'Este navegador no puede guardar imágenes (falta IndexedDB).';
+      return Promise.resolve();
+    }
+    if (!quiet) {
+      el.importState.textContent = 'Copiando ' + rec.name + ' (' + mb(rec.size) +
+        ') al dispositivo. Con imágenes grandes tarda un rato; mientras tanto ya puedes arrancarla.';
+    }
+    return ImageStore.guardar(rec).then(function () {
+      rec.stored = true;
+      if (!quiet) el.importState.textContent = rec.name + ' guardada: ya funciona sin conexión.';
+      return refreshStates();
+    }).catch(function (err) {
+      el.importState.textContent = 'No se pudo guardar ' + rec.name + ': ' +
+        (err && err.message ? err.message : err) + '. Puedes arrancarla igual en esta sesión.';
     });
   }
 
@@ -445,24 +470,31 @@
       memory: rec.memory || 256,
       options: function (bufs) {
         var o = {};
-        o[rec.media] = { buffer: bufs[0] };
-        return o;   // v86 elige solo el orden de arranque según el medio
+        o[rec.media] = { buffer: bufs[0] };   // ArrayBuffer o File, v86 admite ambos
+        return o;                             // y elige solo el orden de arranque
       }
     };
   }
 
   function renderMine() {
-    return ImageStore.listar().then(function (recs) {
+    return ImageStore.listar().then(function (stored) {
+      // Lo guardado en el dispositivo, más lo que acabas de soltar en esta
+      // sesión y todavía no se ha copiado.
+      var recs = stored.map(function (r) { r.stored = true; return r; });
+      session.forEach(function (r) {
+        if (!recs.some(function (s) { return s.id === r.id; })) recs.push(r);
+      });
+
       el.mine.innerHTML = '';
       recs.sort(function (a, b) { return b.added - a.added; }).forEach(function (rec) {
         var sys = importedSystem(rec);
         var li = document.createElement('li');
-        li.className = 'card ready';
+        li.className = 'card' + (rec.stored ? ' ready' : '');
         li.innerHTML =
           '<div class="card-head">' +
             '<b class="card-name"></b><span class="tag"></span><span class="card-size"></span>' +
           '</div>' +
-          '<p class="card-state">Guardada en el dispositivo — funciona sin conexión</p>' +
+          '<p class="card-state"></p>' +
           '<div class="card-actions">' +
             '<button class="btn primary small" data-act="boot">Arrancar</button>' +
             '<button class="btn ghost small" data-act="restore" hidden></button>' +
@@ -475,22 +507,38 @@
                 '<option value="1024">1 GB</option>' +
                 '<option value="2048">2 GB (puede no caber)</option>' +
               '</select></label>' +
+            '<button class="btn ghost small" data-act="keep" hidden>Guardar en el dispositivo</button>' +
             '<button class="btn ghost small" data-act="drop">Borrar</button>' +
           '</div>';
         li.querySelector('.card-name').textContent = rec.name;
         li.querySelector('.tag').textContent = MEDIA[rec.media];
         li.querySelector('.card-size').textContent = mb(rec.size);
+        li.querySelector('.card-state').textContent = rec.stored
+          ? 'Guardada en el dispositivo — funciona sin conexión'
+          : 'Solo en esta sesión: al recargar la página habrá que volver a soltarla.';
+
         var mem = li.querySelector('[data-act="mem"]');
         mem.value = String(sys.memory);
         mem.addEventListener('change', function () {
           sys.memory = parseInt(mem.value, 10);
           rec.memory = sys.memory;
-          ImageStore.guardar(rec);   // recordamos la elección para la próxima
+          if (rec.stored) ImageStore.guardar(rec);   // recordamos la elección
         });
+
         sys.el = { boot: li.querySelector('[data-act="boot"]') };
         li.querySelector('[data-act="boot"]').addEventListener('click', function () {
           bootImported(sys);
         });
+
+        var keep = li.querySelector('[data-act="keep"]');
+        if (!rec.stored) {
+          keep.hidden = false;
+          keep.addEventListener('click', function () {
+            keep.disabled = true;
+            keep.textContent = 'Copiando…';
+            persist(rec).then(renderMine);
+          });
+        }
 
         var st = states[rec.id];
         var restore = li.querySelector('[data-act="restore"]');
@@ -504,8 +552,10 @@
             StateStore.borrar(rec.id).then(refreshStates);
           });
         }
+
         li.querySelector('[data-act="drop"]').addEventListener('click', function () {
-          ImageStore.borrar(rec.id).then(renderMine);
+          session = session.filter(function (r) { return r.id !== rec.id; });
+          Promise.all([ImageStore.borrar(rec.id), StateStore.borrar(rec.id)]).then(refreshStates);
         });
         el.mine.appendChild(li);
       });
@@ -524,9 +574,11 @@
       if (!hit && !navigator.onLine) {
         throw new Error('falta el emulador y no hay conexión: descarga antes cualquier sistema');
       }
-      return sys.record.blob.arrayBuffer();
-    }).then(function (buf) {
-      return withState(sys, [buf], state);
+      // Se lo pasamos a v86 como File: por encima de 256 MB lo lee a trozos.
+      var blob = sys.record.blob;
+      var file = (typeof File !== 'undefined' && blob instanceof File)
+        ? blob : new File([blob], sys.record.name);
+      return withState(sys, [file], state);
     }).catch(function (err) {
       setPhase('No se pudo arrancar');
       sys.el.boot.disabled = false;
