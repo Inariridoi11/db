@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Máquinas virtuales en el navegador</title>
+<meta name="description" content="Sistemas operativos que arrancan dentro del navegador, sin conexión.">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="vm-page">
+<header class="vm-bar">
+  <strong class="vm-title">Máquinas virtuales en el navegador</strong>
+  <span id="phase" class="phase">Elige un sistema</span>
+</header>
+
+<main class="vm-main">
+  <section id="pack" class="pack">
+    <h1>Sistemas operativos, dentro del navegador</h1>
+    <p class="lead">
+      v86 emula un ordenador x86 completo en WebAssembly. Descarga un sistema una vez y
+      arráncalo cuando quieras, también sin conexión.
+    </p>
+    <ul id="systems" class="systems"></ul>
+    <p class="foot-note">
+      Los sistemas se guardan en este dispositivo y se pueden borrar en cualquier momento.
+    </p>
+
+    <h2 class="sub">Tus imágenes</h2>
+    <p class="lead small">
+      Suelta aquí un <code>.iso</code>, un <code>.img</code> o un disco duro virtual y v86 lo
+      arranca al momento. Las pequeñas se guardan solas en el dispositivo; las grandes, solo
+      si pulsas <i>Guardar en el dispositivo</i>, porque copiar cientos de MB lleva su rato.
+    </p>
+    <ul id="mine" class="systems"></ul>
+    <label id="drop" class="dropzone" for="file">
+      <b>Arrastra una imagen aquí</b>
+      <span>o pulsa para elegir un archivo · .iso, .img, .bin</span>
+      <input id="file" type="file" accept=".iso,.img,.ima,.vfd,.bin,.raw,.dsk" hidden>
+    </label>
+    <p id="import-state" class="card-state"></p>
+  </section>
+
+  <section id="stage" class="stage" hidden>
+    <div id="term-wrap" class="term-wrap">
+      <pre id="term" class="term" tabindex="0" aria-label="Terminal de la máquina virtual"></pre>
+      <input id="mobile-input" class="mobile-input" autocomplete="off" autocorrect="off"
+             autocapitalize="off" spellcheck="false" aria-hidden="true">
+    </div>
+
+    <div id="screen" class="screen" hidden>
+      <div class="screen-text"></div>
+      <canvas class="screen-gfx"></canvas>
+    </div>
+
+    <div id="keys" class="keys">
+      <button class="key" data-send="&#9;">Tab</button>
+      <button class="key" data-send="&#27;">Esc</button>
+      <button class="key" data-send="&#3;">Ctrl+C</button>
+      <button class="key" data-send="&#27;[A">▲</button>
+      <button class="key" data-send="&#27;[B">▼</button>
+      <button id="kbd" class="key" type="button">Teclado</button>
+    </div>
+
+    <div class="vm-actions">
+      <button id="save" class="btn ghost small" type="button">Guardar estado</button>
+      <button id="full" class="btn ghost small" type="button" hidden>Pantalla completa</button>
+      <button id="pause" class="btn ghost small" type="button">Pausar</button>
+      <button id="reset" class="btn ghost small" type="button">Reiniciar</button>
+      <button id="close" class="btn ghost small" type="button">Apagar</button>
+    </div>
+
+    <p id="hint" class="hint"></p>
+  </section>
+</main>
+
+<footer class="vm-foot">
+  <span id="net" class="net"></span>
+  <a href="system/KOLIBRIOS.md">KolibriOS</a> ·
+  <a href="system/THIRD_PARTY_NOTICES.md">Linux</a> ·
+  <a href="system/SOURCE_OFFER.md">Código fuente</a> ·
+  <a href="vendor/LICENSE-v86.txt">v86 (BSD-2)</a>
+</footer>
+
+<script src="vendor/libv86.js"></script>
+<script src="term.js"></script>
+<script src="store.js"></script>
+<script src="boot.js"></script>
+</body>
+</html>
