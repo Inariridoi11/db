@@ -1,171 +1,243 @@
-/* Base: colores, tipografía y botones */
+/* ---------------------------------------------------------------
+   Tema: neutro, legible y sin adornos. Sigue el modo claro u oscuro
+   del sistema; la pantalla de la máquina virtual va siempre oscura.
+   --------------------------------------------------------------- */
+
 :root {
-  --bg: #070812;
-  --ink: #e8ecff;
-  --muted: #8d95c4;
-  --cyan: #4af0ff;
-  --magenta: #ff5cc6;
-  --line: rgba(140, 160, 255, .18);
-  --panel: rgba(10, 13, 32, .82);
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --surface-2: #eaeef2;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --muted: #59636e;
+  --accent: #0969da;
+  --accent-text: #ffffff;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+
+  --screen-bg: #0b0f14;
+  --screen-text: #dfe5ef;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --surface: #151b23;
+    --surface-2: #1c232b;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #9198a1;
+    --accent: #4493f8;
+    --accent-text: #05080d;
+    --ok: #3fb950;
+    --warn: #d29922;
+  }
 }
 
 * { box-sizing: border-box; }
+
+/* Varios bloques traen display propio, que gana al [hidden] del navegador. */
+[hidden] { display: none !important; }
 
 html, body {
   min-height: 100%;
   margin: 0;
   background: var(--bg);
-  color: var(--ink);
-  font: 15px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  color: var(--text);
+  font: 15px/1.55 var(--font);
+  -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
-.btn {
-  width: 100%;
-  padding: 13px 18px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn + .btn { margin-top: 8px; }
-.btn.primary {
-  color: #06111c;
-  background: linear-gradient(90deg, var(--cyan), var(--magenta));
-}
-.btn.ghost {
-  color: var(--ink);
-  background: rgba(255, 255, 255, .05);
-  border-color: var(--line);
-}
-.btn:disabled { opacity: .45; cursor: default; }
-.btn:active { transform: translateY(1px); }
-.btn.small { width: auto; padding: 8px 14px; font-size: 13px; margin-top: 0; }
+a { color: var(--accent); }
 
-@media (prefers-reduced-motion: reduce) {
-  .btn:active { transform: none; }
-}
+/* ---------- estructura ---------- */
 
-.vm-page { display: flex; flex-direction: column; min-height: 100%; touch-action: auto; }
+.vm-page { display: flex; flex-direction: column; min-height: 100vh; }
 
 .vm-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(20, 26, 60, .75), transparent);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
 }
-.back { color: var(--muted); text-decoration: none; font-size: 13px; }
-.back:hover { color: var(--ink); }
-.vm-title { flex: 1; font-size: 15px; }
+
+.vm-title { flex: 1; font-size: 15px; font-weight: 600; }
+
 .phase {
   padding: 3px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 11.5px;
+  background: var(--surface);
+  font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
 }
-.phase.on { color: #45ffa8; border-color: rgba(69, 255, 168, .4); }
+.phase.on { color: var(--ok); border-color: currentColor; }
 
-.vm-main { flex: 1; padding: 20px 16px 32px; }
-
-.pack {
-  width: min(560px, 100%);
+.vm-main {
+  flex: 1;
+  width: 100%;
+  max-width: 860px;
   margin: 0 auto;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--panel);
+  padding: 28px 20px 40px;
 }
-.pack { width: min(680px, 100%); }
-.pack h1 { margin: 0 0 8px; font-size: 22px; }
-.lead { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
-.progress { margin: 10px 0 16px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.vm-foot {
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+}
+.vm-foot a { color: var(--muted); text-decoration: none; }
+.vm-foot a:hover { color: var(--accent); text-decoration: underline; }
+.net:not(:empty) { display: block; margin-bottom: 6px; color: var(--warn); }
+
+/* ---------- textos ---------- */
+
+h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.sub { margin: 34px 0 6px; font-size: 16px; font-weight: 600; }
+.lead { margin: 0 0 20px; color: var(--muted); font-size: 14px; max-width: 62ch; }
+.lead.small { font-size: 13px; margin-bottom: 14px; }
+.foot-note { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
+
+code {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  font: 12.5px/1 var(--mono);
+}
+
+/* ---------- botones ---------- */
+
+.btn {
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: 500 13.5px/1.4 var(--font);
+  cursor: pointer;
+}
+.btn.primary { background: var(--accent); color: var(--accent-text); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.ghost {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn.ghost:hover:not(:disabled) { background: var(--surface-2); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.small { padding: 7px 12px; font-size: 13px; }
+
+/* ---------- fichas de sistemas ---------- */
+
+.systems { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+
+.card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.card.ready { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+
+.card-head { display: flex; align-items: baseline; gap: 10px; }
+.card-name { font-size: 15px; font-weight: 600; }
+.tag {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 11px;
+  color: var(--muted);
+}
+.card-size { margin-left: auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-desc { margin: 8px 0 0; font-size: 13.5px; color: var(--muted); }
+.card-state { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card.ready .card-state { color: var(--ok); }
+.card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
 
 .bar {
-  height: 8px;
-  margin-bottom: 8px;
+  height: 4px;
+  margin-top: 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .07);
+  background: var(--surface-2);
   overflow: hidden;
 }
 .bar-fill {
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, var(--cyan), var(--magenta));
+  background: var(--accent);
   transition: width .2s ease;
 }
 
-.systems { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
-
-.card {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .03);
+.mem { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.mem select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
 }
-.card.ready { border-color: rgba(69, 255, 168, .35); }
 
-.card-head { display: flex; align-items: center; gap: 9px; }
-.card-name { font-size: 16px; }
-.tag {
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-  color: var(--muted);
+/* ---------- importar ---------- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  padding: 26px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: center;
+  cursor: pointer;
 }
-.card-size { margin-left: auto; font-size: 12px; color: var(--muted); }
-.card-desc { margin: 8px 0 12px; font-size: 13px; color: var(--muted); }
-.card-state { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.card.ready .card-state { color: #45ffa8; }
-.card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.card-actions .btn { width: auto; }
+.dropzone:hover, .dropzone.over { border-color: var(--accent); background: var(--surface-2); }
+.dropzone b { font-size: 13.5px; font-weight: 600; }
+.dropzone span { font-size: 12.5px; color: var(--muted); }
 
-.foot-note { margin: 16px 0 0; font-size: 12px; color: var(--muted); }
+/* ---------- máquina virtual ---------- */
 
-/* Pantalla gráfica (KolibriOS y compañía) */
-.screen {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #000;
-  padding: 6px;
-  overflow: auto;
-}
-.screen[hidden] { display: none; }
-.screen .screen-text { white-space: pre; font: 14px/1.06 monospace; color: #d8dcff; }
-.screen .screen-gfx { display: none; max-width: 100%; image-rendering: pixelated; }
-
-.stage { width: min(900px, 100%); margin: 0 auto; }
+.stage { display: grid; gap: 14px; }
 
 .term-wrap { position: relative; }
-.term-wrap[hidden] { display: none; }
 
 .term {
   margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #05060f;
-  color: #d6dcff;
-  font: 14px/1.25 "DejaVu Sans Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--screen-bg);
+  color: var(--screen-text);
+  font: 13px/1.3 var(--mono);
   white-space: pre;
   overflow-x: auto;
   outline: none;
 }
-.term:focus { border-color: rgba(74, 240, 255, .45); }
+.term:focus { border-color: var(--accent); }
 .term .cur {
   font-style: normal;
-  background: var(--cyan);
-  color: #05060f;
-  animation: blink 1.1s steps(1, end) infinite;
+  background: var(--screen-text);
+  color: var(--screen-bg);
 }
-@keyframes blink { 50% { background: transparent; color: inherit; } }
 
 /* Campo invisible: solo existe para que el móvil saque su teclado. */
 .mobile-input {
@@ -179,82 +251,69 @@ html, body {
   opacity: 0;
 }
 
-.keys[hidden] { display: none; }
-.keys { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.key {
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, .05);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.key:active { background: rgba(255, 255, 255, .12); }
-
-.vm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.hint { margin: 12px 0 0; font-size: 12.5px; color: var(--muted); }
-.hint code {
-  padding: 1px 5px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, .05);
-  color: var(--ink);
-}
-
-.vm-foot {
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-}
-.vm-foot a { color: var(--muted); }
-.net.off { color: #ffb545; }
-
-@media (max-width: 560px) {
-  .term { font-size: 9px; padding: 8px; }
-  .pack { padding: 18px 14px; }
-}
-
-/* Zona para soltar imágenes propias */
-.sub { margin: 26px 0 6px; font-size: 15px; }
-.lead.small { font-size: 12.5px; margin-bottom: 12px; }
-.lead code {
-  padding: 1px 5px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, .05);
-  color: var(--ink);
-}
-
-.dropzone {
+.screen {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
   align-items: center;
-  padding: 22px 16px;
-  border: 1px dashed var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .02);
-  text-align: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+  overflow: auto;
+}
+.screen .screen-text {
+  white-space: pre;
+  font: 13px/1.15 var(--mono);
+  color: var(--screen-text);
+}
+.screen .screen-gfx { display: none; max-width: 100%; image-rendering: pixelated; }
+
+.keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.key {
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: 12.5px/1.4 var(--font);
   cursor: pointer;
 }
-.dropzone:hover, .dropzone.over {
-  border-color: var(--cyan);
-  background: rgba(74, 240, 255, .07);
-}
-.dropzone b { font-size: 14px; }
-.dropzone span { font-size: 12px; color: var(--muted); }
+.key:hover { background: var(--surface-2); }
 
-.mem { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-.mem select {
-  padding: 7px 8px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, .05);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12.5px;
+.vm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hint { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+/* ---------- pantalla completa ---------- */
+
+/* Se lleva el bloque entero, no solo la pantalla, para que los controles
+   sigan estando a mano sin tener que salir. */
+.stage:fullscreen {
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg);
+  grid-template-rows: 1fr auto auto;
+}
+.stage:fullscreen .screen,
+.stage:fullscreen .term-wrap { min-height: 0; }
+.stage:fullscreen .screen { height: 100%; }
+.stage:fullscreen .screen-gfx {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+}
+.stage:fullscreen .screen-text { font-size: 15px; }
+.stage:fullscreen .term {
+  height: 100%;
+  font-size: clamp(13px, 1.5vw, 20px);
+}
+.stage:fullscreen .hint { display: none; }
+
+/* ---------- móvil ---------- */
+
+@media (max-width: 600px) {
+  .vm-main { padding: 20px 16px 32px; }
+  .term { font-size: 9.5px; padding: 10px; }
+  .screen .screen-text { font-size: 9.5px; }
+  .card-actions .btn { flex: 1 1 auto; }
 }

@@ -58,7 +58,7 @@
     mine: $('mine'), drop: $('drop'), file: $('file'), importState: $('import-state'),
     term: $('term'), termWrap: $('term-wrap'), screen: $('screen'), keys: $('keys'),
     input: $('mobile-input'), kbd: $('kbd'), hint: $('hint'), net: $('net'),
-    pause: $('pause'), reset: $('reset'), close: $('close')
+    pause: $('pause'), reset: $('reset'), close: $('close'), full: $('full')
   };
 
   var mb = function (n) { return (n / 1048576).toFixed(1) + ' MB'; };
@@ -66,6 +66,8 @@
   var emulator = null;
   var term = null;
   var current = null;
+  // El móvil de Apple no deja poner en pantalla completa nada que no sea vídeo.
+  var canFullscreen = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
 
   function totalBytes(sys) {
     return sys.files.reduce(function (n, f) { return n + f.bytes; }, 0) + runtimeBytes;
@@ -264,6 +266,7 @@
     el.screen.hidden = !graphical;
     el.termWrap.hidden = sys.kind !== 'serial';
     el.keys.hidden = sys.kind !== 'serial';
+    if (el.full) el.full.hidden = !canFullscreen;
     setPhase('Arrancando ' + sys.name + '…');
 
     var opts = {
@@ -501,6 +504,35 @@
     btn.addEventListener('click', function () { send(btn.getAttribute('data-send')); });
   });
 
+  /* ---------- pantalla completa ---------- */
+
+  function toggleFullscreen() {
+    var out = document.fullscreenElement || document.webkitFullscreenElement;
+    if (out) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      return;
+    }
+    // Va a pantalla completa el bloque entero, no solo la pantalla: así los
+    // botones de pausar, reiniciar y salir siguen a mano.
+    var node = el.stage;
+    var enter = node.requestFullscreen || node.webkitRequestFullscreen;
+    if (enter) {
+      var r = enter.call(node);
+      if (r && r.catch) r.catch(function (err) { console.warn('pantalla completa:', err); });
+    }
+  }
+
+  function syncFullscreenLabel() {
+    var out = document.fullscreenElement || document.webkitFullscreenElement;
+    el.full.textContent = out ? 'Salir de pantalla completa' : 'Pantalla completa';
+  }
+
+  if (el.full && canFullscreen) {
+    el.full.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', syncFullscreenLabel);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenLabel);
+  }
+
   /* ---------- controles ---------- */
 
   el.pause.addEventListener('click', function () {
@@ -528,6 +560,9 @@
     if (term) { term.destroy(); term = null; }
     pending = '';
     el.term.textContent = '';
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
     el.stage.hidden = true;
     el.pack.hidden = false;
     el.pause.textContent = 'Pausar';

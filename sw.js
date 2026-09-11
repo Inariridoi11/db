@@ -1,7 +1,7 @@
 /* Service worker: guarda la web entera para poder abrirla sin conexión.
    Las imágenes de los sistemas van en su propia caché, gestionada por boot.js,
    y las que importa el usuario viven en IndexedDB. */
-var VERSION = 'vm-shell-v1';
+var VERSION = 'vm-shell-v2';
 var KEEP = [VERSION, 'vm-systems-v1'];
 var ASSETS = [
   './',

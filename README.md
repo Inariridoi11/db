@@ -4,7 +4,9 @@ Web instalable (PWA) que arranca **sistemas operativos de verdad** dentro de una
 sobre el emulador **v86**, y que funciona **sin internet**: descargas el sistema una vez y
 a partir de ahí arranca aunque estés en modo avión.
 
-![KolibriOS arrancado sin conexión](docs/linux.png)
+![Catálogo de sistemas](docs/catalogo.png)
+
+![KolibriOS a pantalla completa](docs/kolibri.png)
 
 | Sistema | Peso | Qué es |
 | --- | --- | --- |
@@ -52,6 +54,11 @@ La URL resultante ya sirve por HTTPS, así que la instalación y el modo offline
 aceleración gráfica: da para sistemas ligeros, no para escritorios modernos.
 
 - KolibriOS llega al escritorio en unos **10 s** y Linux a la shell en **1-2 s**.
+- Hay **pantalla completa** para cualquier sistema: se lleva el bloque entero, así que los
+  botones de pausar, reiniciar y salir siguen a mano. En el iPhone no aparece, porque Safari
+  solo deja poner en pantalla completa los vídeos.
+- La interfaz sigue el **modo claro u oscuro** del sistema; la pantalla de la máquina virtual
+  va siempre oscura.
 - Los sistemas **gráficos** usan el canvas de v86 con teclado y ratón. El ratón es
   **relativo**, así que el cursor de dentro no coincide con el de fuera, como en cualquier
   máquina virtual sin puntero absoluto.
