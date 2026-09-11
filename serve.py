@@ -76,8 +76,7 @@ def main():
               'servidor? Prueba: python3 serve.py 8001' % port)
         return 1
 
-    print('Órbita en http://localhost:%d' % port)
-    print('Linux    en http://localhost:%d/linux/' % port)
+    print('Abre http://localhost:%d' % port)
     print('Ctrl+C para parar.')
     for server in servers[1:]:
         threading.Thread(target=server.serve_forever, daemon=True).start()

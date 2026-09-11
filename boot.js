@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  var CACHE = 'orbita-linux-v1';
+  var CACHE = 'vm-systems-v1';
 
   // Archivos que necesita cualquier sistema: el emulador y las dos BIOS.
   var RUNTIME = [
@@ -546,7 +546,7 @@
   addEventListener('offline', net);
   net();
 
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   refreshAll();
   renderMine();
 })();

@@ -1,26 +1,22 @@
-/* Service worker: guarda el juego entero para poder abrirlo sin conexión. */
-var VERSION = 'orbita-v5';
-// La caché del pack de Linux se gestiona desde la página y no se borra aquí.
-var KEEP = [VERSION, 'orbita-linux-v1'];
+/* Service worker: guarda la web entera para poder abrirla sin conexión.
+   Las imágenes de los sistemas van en su propia caché, gestionada por boot.js,
+   y las que importa el usuario viven en IndexedDB. */
+var VERSION = 'vm-shell-v1';
+var KEEP = [VERSION, 'vm-systems-v1'];
 var ASSETS = [
   './',
   'index.html',
   'styles.css',
-  'game.js',
-  'app.js',
+  'boot.js',
+  'term.js',
+  'store.js',
   'manifest.webmanifest',
+  'vendor/libv86.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
-  'icons/favicon-32.png',
-  'linux/',
-  'linux/index.html',
-  'linux/linux.css',
-  'linux/boot.js',
-  'linux/term.js',
-  'linux/store.js',
-  'linux/vendor/libv86.js'
+  'icons/favicon-32.png'
 ];
 
 function urls() {
@@ -89,8 +85,6 @@ self.addEventListener('fetch', function (e) {
         caches.open(VERSION).then(function (c) { c.put(req, copy); });
         return res;
       }).catch(function () {
-        // Primero la copia exacta de esa página (/linux/ no es la portada),
-        // luego su index.html, y solo al final la portada como último recurso.
         var candidates = [req.url];
         if (url.pathname.charAt(url.pathname.length - 1) === '/') {
           candidates.push(url.origin + url.pathname + 'index.html');

@@ -1,18 +1,16 @@
-# Órbita — juego arcade (y un Linux) que funcionan sin conexión
+# Sistemas operativos en el navegador, sin conexión
 
-Web instalable (PWA): al abrirla ofrece **instalarla** y **descargar todo su contenido**
-en el dispositivo, así que después puedes abrirla y jugar sin internet (incluso en modo avión).
+Web instalable (PWA) que arranca **sistemas operativos de verdad** dentro de una pestaña,
+sobre el emulador **v86**, y que funciona **sin internet**: descargas el sistema una vez y
+a partir de ahí arranca aunque estés en modo avión.
 
-Trae dos cosas:
+![KolibriOS arrancado sin conexión](docs/linux.png)
 
-- **Órbita**, un arcade espacial en canvas.
-- **`/linux/`**, un catálogo de **sistemas operativos de verdad** arrancando en el navegador
-  sobre el emulador **v86**: un Linux 6.12 de consola y el escritorio gráfico KolibriOS.
-  Cada uno se descarga aparte y funciona sin conexión.
-
-![Menú del juego](docs/menu.png)
-
-![Linux arrancado sin conexión](docs/linux.png)
+| Sistema | Peso | Qué es |
+| --- | --- | --- |
+| **KolibriOS** | 3,6 MB | Escritorio gráfico a 1024×768, con ratón, apps y juegos, en un disquete de 1,44 MB |
+| **Linux 6.12** | 10 MB | Consola con BusyBox: shell, sistema de archivos y `vi` |
+| **La tuya** | — | Suelta un `.iso` o un `.img` y lo arranca |
 
 ## Cómo probarla
 
@@ -20,119 +18,82 @@ Necesita **HTTPS o localhost** (es un requisito de los service workers; con `fil
 
 ```bash
 python3 serve.py
-# Órbita en http://localhost:8000 y Linux en http://localhost:8000/linux/
+# abre http://localhost:8000
 ```
 
-Escucha en las dos formas de localhost (`127.0.0.1` y `::1`), porque en Windows el
-navegador prueba antes la IPv6 y un servidor solo-IPv4 le da *connection refused*.
+Usa `serve.py` y no `python -m http.server`: en Windows, el módulo estándar saca los tipos
+MIME del registro, donde `.css` y `.js` suelen estar como `text/plain`. Con ese tipo el
+navegador **ignora la hoja de estilos** y **se niega a registrar el service worker**, así que
+ni hay diseño ni modo offline. `serve.py` los fija a mano y escucha en las dos formas de
+localhost (`127.0.0.1` y `::1`), porque en Windows el navegador prueba antes la IPv6.
 
-Usa `serve.py` y no `python -m http.server`: en Windows, el módulo estándar saca los
-tipos MIME del registro, donde `.css` y `.js` suelen estar como `text/plain`. Con ese tipo
-el navegador **ignora la hoja de estilos** (la web sale sin diseño) y **se niega a registrar
-el service worker**, así que tampoco hay modo offline. `serve.py` los fija a mano.
+## Publicarla en GitHub Pages
 
-## Cómo publicarla en GitHub Pages
-
-Dos opciones:
-
-- **Sencilla**: *Settings → Pages → Source: Deploy from a branch*, elige la rama y la carpeta `/ (root)`.
-- **Con Actions**: fusiona a `main` y el workflow `.github/workflows/pages.yml` la despliega
-  (*Settings → Pages → Source: GitHub Actions*).
-
-La URL resultante (`https://<usuario>.github.io/<repo>/`) ya sirve por HTTPS, así que la
-instalación y el modo offline funcionan directamente.
+*Settings → Pages → Source: Deploy from a branch*, eliges la rama y la carpeta `/ (root)`.
+También hay un workflow en `.github/workflows/pages.yml` si prefieres desplegar con Actions.
+La URL resultante ya sirve por HTTPS, así que la instalación y el modo offline funcionan.
 
 ## Cómo funciona el modo offline
 
-- `sw.js` es un **service worker** que, al instalarse, descarga y guarda en la caché del
-  navegador todos los archivos del juego (HTML, CSS, JS, iconos y manifiesto).
-- Después responde **primero desde la caché**: si no hay red, la web se abre igual.
-  Las navegaciones caen al `index.html` guardado.
-- El botón **«Descargar contenido offline»** fuerza esa descarga a mano y la tarjeta del
-  menú muestra cuántos archivos hay guardados (`11/11` = listo).
-- El botón **«Instalar»** aparece cuando el navegador lo permite (Chrome, Edge, Android…).
-  En iPhone/iPad se instala con *Compartir → Añadir a pantalla de inicio*.
+- `sw.js` es un **service worker** que guarda la web en sí (HTML, CSS, JS, iconos) y responde
+  **primero desde la caché**, de modo que la página abre sin red.
+- Las **imágenes de los sistemas** van en su propia caché (`vm-systems-v1`), descargadas desde
+  las fichas con barra de progreso. El emulador y las BIOS (2,3 MB) se comparten entre todos
+  los sistemas y solo se borran cuando no queda ninguno.
+- Las **imágenes que importas tú** van a **IndexedDB** (`store.js`): son archivos de cientos
+  de MB que no vienen de ninguna URL, y se guarda el `Blob` tal cual, sin leerlo entero en
+  memoria hasta el arranque.
 - Para publicar cambios, sube el número de `VERSION` en `sw.js`: el nuevo service worker
-  vuelve a descargar todo y borra la caché antigua.
+  vuelve a descargar la web y borra la caché antigua, sin tocar los sistemas descargados.
 
-## Sistemas dentro del navegador (`/linux/`)
+## Detalles de la emulación
 
-**v86** emula un PC x86 traduciendo su código máquina a WebAssembly. Como todo son archivos
-estáticos, se guardan en Cache Storage y luego arrancan **sin red**.
+**v86** emula un PC x86 traduciendo su código máquina a WebAssembly. Un núcleo, 32 bits, sin
+aceleración gráfica: da para sistemas ligeros, no para escritorios modernos.
 
-| Sistema | Peso | Qué es |
-| --- | --- | --- |
-| **KolibriOS** | 3,6 MB | Escritorio gráfico a 1024×768, con ratón, apps y juegos, en un disquete de 1,44 MB |
-| **Linux 6.12** | 10 MB | Consola con BusyBox: shell, sistema de archivos y `vi` |
-
-Cada ficha se descarga por separado, con barra de progreso y botón para borrarla; el
-emulador y las BIOS (2,3 MB) se comparten y solo se borran cuando no queda ningún sistema.
+- KolibriOS llega al escritorio en unos **10 s** y Linux a la shell en **1-2 s**.
+- Los sistemas **gráficos** usan el canvas de v86 con teclado y ratón. El ratón es
+  **relativo**, así que el cursor de dentro no coincide con el de fuera, como en cualquier
+  máquina virtual sin puntero absoluto.
+- Los sistemas **de consola** sacan la pantalla por el puerto serie y la dibuja `term.js`, un
+  terminal VT100 propio (cursor, regiones de scroll y secuencias ANSI) que aguanta `vi` o
+  `top`. Se usa la serie porque la consola VGA de v86 se congela con este kernel.
+- Las teclas se mandan **de una en una**: el puerto serie emulado no tiene cola y al escribir
+  rápido se perdían caracteres.
+- En móvil, un campo invisible saca el teclado del sistema, y hay botones de Tab, Esc,
+  Ctrl+C y flechas.
 
 ### Importar tus propias imágenes
 
-Debajo del catálogo puedes **soltar un `.iso`, un `.img` o un disco duro virtual** y v86 lo
-arranca. Se guarda en **IndexedDB** (no en Cache Storage: son archivos de cientos de MB que
-no vienen de ninguna URL) y el `Blob` se guarda tal cual, sin leerlo entero en memoria hasta
-el arranque. Después sigue ahí, también sin conexión.
+El medio se elige por el archivo: `.iso` → CD-ROM, `.img` de hasta 2,88 MB → disquete, el
+resto → disco duro; v86 decide solo el orden de arranque. Cada imagen tiene su **selector de
+RAM** (128 MB a 1 GB) y recuerda la elección. Como no se sabe de antemano cómo va a pintar una
+imagen ajena, se muestra el canvas y, si además habla por el puerto serie, aparece el terminal
+debajo.
 
-- El medio se elige por el archivo: `.iso` → CD-ROM, `.img` de hasta 2,88 MB → disquete,
-  el resto → disco duro. v86 decide solo el orden de arranque según el medio.
-- Cada imagen tiene su **selector de RAM** (128 MB a 1 GB) y recuerda tu elección.
-- Como no se sabe de antemano cómo pinta una imagen ajena, se muestra el canvas y, si además
-  habla por el puerto serie, aparece el terminal debajo.
+Aquí entran Tiny Core (X11), FreeDOS o cualquier distro de 32 bits: te la bajas tú y la
+sueltas. Con lo gordo, cuenta con que irá lento.
 
-Aquí es donde entran Tiny Core (X11), FreeDOS o cualquier distro de 32 bits: te la bajas tú
-y la sueltas. Ojo con lo gordo: un escritorio completo son cientos de MB y va lento
-(v86 emula un solo núcleo sin 64 bits ni aceleración gráfica).
+## Licencias
 
-- KolibriOS llega al escritorio en unos **10 s** y Linux a la shell en **1-2 s** (más lento
-  sin red la primera vez, porque hay que leerlo todo de la caché).
-- Los sistemas gráficos usan el canvas de v86 con **teclado y ratón**; ojo, el ratón es
-  **relativo**, así que el cursor de dentro no coincide con el de fuera (como en cualquier
-  máquina virtual sin puntero absoluto).
-- Los de consola usan el puerto serie y `term.js`.
-- La consola sale por el **puerto serie** y la dibuja `term.js`, un terminal VT100 propio
-  (cursor, regiones de scroll y secuencias ANSI), suficiente para `vi`, `top` o `less`.
-  Se usa la serie porque la consola VGA de v86 se congela con este kernel.
-- Teclado real en escritorio y teclado del sistema en móvil, más botones de Tab, Esc,
-  Ctrl+C y flechas. Las teclas se envían de una en una porque el puerto serie emulado
-  no tiene cola y si no se pierden caracteres al escribir rápido.
-
-El sistema de archivos original pesaba 33 MB; está recortado a 2,2 MB dejando BusyBox,
-la glibc y poco más (fuera git, X11, CUPS, sqlite, Node, Python…). Los binarios son GPL:
-`linux/system/THIRD_PARTY_NOTICES.md` y `linux/system/SOURCE_OFFER.md` viajan con ellos y
-**hay que mantenerlos** si redistribuyes esto. KolibriOS (`linux/system/kolibri.img`) es la imagen de disquete sin modificar, tomada de un
-espejo del proyecto; sus datos y licencia están en `linux/system/KOLIBRIOS.md`.
-
-La imagen de Linux viene del paquete npm
-[`sharjeenux`](https://www.npmjs.com/package/sharjeenux) (MIT su envoltorio, GPL/LGPL lo
-de dentro) y v86 es BSD-2-Clause.
-
-## El juego
-
-Arcade espacial en canvas, sin ningún recurso externo (los sonidos se sintetizan con
-WebAudio y los gráficos se dibujan por código), que es justo lo que permite que funcione
-offline sin descargas extra.
-
-- **Teclado**: `←` `→` o `A` `D` para moverte, `espacio` para disparar, `P` pausa, `Enter` para empezar.
-- **Móvil**: arrastra el dedo para mover la nave; dispara sola.
-- Oleadas cada 22 s, asteroides, cazas que te disparan y mejoras: `S` escudo, `R` disparo
-  rápido, `+` vida extra. El récord se guarda en el dispositivo.
+- **v86**: BSD-2-Clause (`vendor/LICENSE-v86.txt`).
+- **KolibriOS**: software libre; procedencia y avisos en `system/KOLIBRIOS.md`. La imagen no
+  está modificada.
+- **Linux + BusyBox + glibc**: GPL/LGPL. `system/THIRD_PARTY_NOTICES.md` y
+  `system/SOURCE_OFFER.md` **tienen que acompañar a los binarios** si redistribuyes esto.
+  La imagen viene del paquete npm [`sharjeenux`](https://www.npmjs.com/package/sharjeenux),
+  con el sistema de archivos recortado de 33 MB a 2,2 MB (BusyBox y glibc; fuera git, X11,
+  CUPS, sqlite, Node y Python).
 
 ## Archivos
 
 | Archivo | Para qué sirve |
 | --- | --- |
-| `index.html` | Estructura, HUD y menú con los botones de instalar/descargar |
-| `styles.css` | Estilos |
-| `game.js` | El juego (bucle, física, dibujo y sonido) |
-| `app.js` | Instalación, estado del cacheo offline y enlace con el juego |
-| `sw.js` | Service worker: descarga y sirve el contenido sin conexión |
-| `linux/index.html` · `boot.js` | Página del emulador: descarga del pack y arranque |
-| `linux/term.js` | Terminal VT100 que dibuja la consola de la máquina virtual |
-| `linux/store.js` | Guarda en IndexedDB las imágenes que importa el usuario |
-| `linux/vendor/` | v86 (emulador y BIOS) |
-| `linux/system/` | Kernel Linux, KolibriOS y avisos de licencia |
+| `index.html` · `styles.css` | La página: catálogo de sistemas y pantalla de la máquina |
+| `boot.js` | Descarga de sistemas, importación y arranque de v86 |
+| `term.js` | Terminal VT100 que dibuja la consola por el puerto serie |
+| `store.js` | Guarda en IndexedDB las imágenes que importa el usuario |
+| `sw.js` | Service worker: sirve la web sin conexión |
+| `vendor/` | v86 (emulador y BIOS) |
+| `system/` | Imágenes de los sistemas y avisos de licencia |
 | `serve.py` | Servidor local con los tipos MIME correctos (sobre todo en Windows) |
-| `manifest.webmanifest` | Nombre, iconos y colores de la app instalada |
-| `icons/` | Iconos de la app (incluye uno *maskable* para Android) |
